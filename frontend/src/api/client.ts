@@ -1,4 +1,4 @@
-import type { Article, ArticleCard, ArticleListResponse, Category, Tag, ImportAnalyzeResponse } from '../types';
+import type { Article, ArticleCard, ArticleListResponse, Category, CategoryCreate, Tag, ImportAnalyzeResponse } from '../types';
 
 const BASE = '/api';
 
@@ -18,16 +18,28 @@ export const api = {
     delete: (slug: string): Promise<void> => request(`/articles/${slug}`, { method: 'DELETE' }),
     create: (form: FormData): Promise<Article> =>
       request('/articles', { method: 'POST', body: form }),
-    update: (slug: string, data: object): Promise<Article> =>
-      request(`/articles/${slug}`, {
-        method: 'PUT',
+    update: (slug: string, form: FormData): Promise<Article> =>
+      request(`/articles/${slug}`, { method: 'PUT', body: form }),
+    aiCategorize: (): Promise<Response> =>
+      fetch(`${BASE}/articles/ai-categorize`, { method: 'POST' }),
+    aiClassify: (title: string, body: string): Promise<{ categories: string[]; tags: string[] }> =>
+      request('/articles/ai-classify', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ title, body }),
       }),
   },
   categories: {
     list: (): Promise<Category[]> => request('/categories'),
     tags: (limit = 50): Promise<Tag[]> => request(`/categories/tags?limit=${limit}`),
+    create: (data: CategoryCreate): Promise<Category> =>
+      request('/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+    delete: (slug: string): Promise<void> =>
+      fetch(`${BASE}/categories/${slug}`, { method: 'DELETE' }).then(() => {}),
   },
   search: {
     query: (q: string): Promise<ArticleCard[]> =>

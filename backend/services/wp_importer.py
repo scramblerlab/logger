@@ -68,7 +68,7 @@ async def _detect_wp_base(client: httpx.AsyncClient, url: str) -> tuple[str, int
 def _html_to_md(html: str) -> str:
     converter = html2text.HTML2Text()
     converter.ignore_links = False
-    converter.ignore_images = True
+    converter.ignore_images = False
     converter.body_width = 0
     return converter.handle(html).strip()
 
@@ -176,14 +176,26 @@ async def _fetch_posts(client: httpx.AsyncClient, url: str, base: str, limit: in
                 except Exception:
                     pass
 
+                body_html = p["content"]["rendered"]
+                extra_image_urls = []
+                try:
+                    body_soup = BeautifulSoup(body_html, "html.parser")
+                    for img in body_soup.find_all("img"):
+                        src = (img.get("src") or img.get("data-lazy-src")
+                               or img.get("data-src"))
+                        if src and src != hero_url:
+                            extra_image_urls.append(src)
+                except Exception:
+                    pass
+
                 posts.append({
                     "title": BeautifulSoup(f"<span>{p['title']['rendered']}</span>", "html.parser").get_text(),
-                    "body_html": p["content"]["rendered"],
+                    "body_html": body_html,
                     "published_at": p.get("date"),
                     "source_url": p.get("link", ""),
                     "categories": [],
                     "hero_image_url": hero_url,
-                    "extra_image_urls": [],
+                    "extra_image_urls": extra_image_urls[:12],
                 })
             if len(posts) >= limit or len(batch) < 100:
                 break
@@ -352,9 +364,7 @@ async def import_articles(
         title = raw.get("title", "Untitled")
         yield {"type": "progress", "done": done, "total": total, "current_title": title}
 
-        body_md = _html_to_md(raw.get("body_html", ""))
-
-        # Download images
+        # Build slug first — needed for image paths
         from services.storage import download_and_save
         from slugify import slugify
 
@@ -372,16 +382,26 @@ async def import_articles(
         import uuid as _uuid
         slug = f"{date_prefix}-{slug_base}-{_uuid.uuid4().hex[:4]}"
 
+        # Download hero
         hero_rel = None
         if raw.get("hero_image_url"):
             hero_rel = await download_and_save(slug, raw["hero_image_url"], "hero.jpg", is_hero=True)
 
+        # Download body images and build a rewrite map (original URL → local static path)
         extra_rels = []
-        for img_url in raw.get("extra_image_urls", [])[:8]:
+        url_rewrite: dict[str, str] = {}
+        for img_url in raw.get("extra_image_urls", [])[:12]:
             fname = img_url.split("/")[-1].split("?")[0] or "image.jpg"
             rel = await download_and_save(slug, img_url, fname)
             if rel:
                 extra_rels.append(rel)
+                url_rewrite[img_url] = f"/static/articles/{slug}/{rel}"
+
+        # Rewrite image URLs in body HTML to local paths, then convert to Markdown
+        body_html = raw.get("body_html", "")
+        for orig_url, local_url in url_rewrite.items():
+            body_html = body_html.replace(orig_url, local_url)
+        body_md = _html_to_md(body_html)
 
         categories = raw.get("categories", [])
         tags = raw.get("tags", [])

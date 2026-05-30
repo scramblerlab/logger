@@ -1,6 +1,6 @@
 # logger
 
-A self-hosted, AI-powered lifestyle blog app. Consolidates content from six WordPress sub-sites at scrambler-lab.com into a single searchable interface, with AI auto-classification, bulk import, and worldwide access via CloudFlare tunnel.
+A self-hosted, AI-powered lifestyle blog app. Consolidates content from six WordPress sub-sites at scrambler-lab.com into a single searchable interface, with local AI auto-classification, bulk import, and worldwide access via CloudFlare tunnel.
 
 ---
 
@@ -9,13 +9,16 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 | Feature | Details |
 |---|---|
 | **Post articles** | Web UI with Markdown editor, hero image drag-and-drop, bilingual title (EN/JA) |
-| **AI tagging** | Submitting an article calls Claude to auto-assign categories and tags |
-| **Browse** | Card grid with hero image, category badge, tags; category sidebar + tag cloud |
+| **AI tagging** | Per-article "✦ AI分析" button — local Ollama model auto-assigns categories and tags |
+| **Bulk AI classify** | "AI分類" button classifies all uncategorized articles in one pass |
+| **Category management** | Add / delete categories from the sidebar; article counts shown inline |
+| **Browse** | Card grid with hero image, category badge, tags; dark-themed sidebar + tag cloud |
 | **Search** | SQLite FTS5 full-text search across titles and body content |
 | **Bulk import** | One-click import from any WordPress site — REST API with sitemap/HTML fallback |
+| **Image editing** | Edit page lets you replace the hero image and add/remove additional images |
 | **Public access** | CloudFlare tunnel exposes localhost to the internet without port-forwarding |
 
-**Categories:** bike / onsen / sentou / container / cooking / lens / sauna / auto / diy / beer
+**Categories (seeds):** bike / onsen / sentou / container / cooking / lens / sauna / auto / diy / beer
 
 ---
 
@@ -24,9 +27,9 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 | Layer | Choice |
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy async, SQLite |
-| AI | Anthropic SDK — `claude-sonnet-4-6` |
+| AI | Ollama (local) — `gemma4:e2b-mlx` (Apple Silicon MLX, ~7 GB) |
 | Scraping | `httpx` + `BeautifulSoup4` + WordPress REST API |
-| Frontend | React 18, Vite, TypeScript, Tailwind CSS |
+| Frontend | React 18, Vite, TypeScript, Tailwind CSS, dark theme |
 | Tunnel | `cloudflared` (Homebrew), Mac launchd autostart |
 
 ---
@@ -41,12 +44,12 @@ logger/
 │   ├── models.py            # SQLAlchemy ORM: Article, Category, Tag
 │   ├── schemas.py           # Pydantic request/response schemas
 │   ├── routers/
-│   │   ├── articles.py      # CRUD + multipart image upload
-│   │   ├── categories.py    # Category list + tag counts
+│   │   ├── articles.py      # CRUD + image upload + AI classify endpoints
+│   │   ├── categories.py    # Category list + CRUD + tag counts
 │   │   ├── search.py        # FTS5 full-text search
 │   │   └── importer.py      # Bulk import (SSE streaming)
 │   ├── services/
-│   │   ├── ai_classifier.py # Claude API: auto-categorise + tag
+│   │   ├── ai_classifier.py # Ollama API: auto-categorise + tag
 │   │   ├── wp_importer.py   # WordPress importer (REST API / sitemap / scrape)
 │   │   └── storage.py       # Image save/optimise, article.json read/write
 │   ├── data/                # ⚠ NOT in git — see "Article Data" section below
@@ -56,7 +59,7 @@ logger/
 │   │           ├── article.json
 │   │           ├── hero.jpg
 │   │           └── images/
-│   ├── .env                 # ⚠ NOT in git — add ANTHROPIC_API_KEY here
+│   ├── .env                 # ⚠ NOT in git — copy from .env.example
 │   ├── .env.example         # Template for .env
 │   └── requirements.txt
 ├── frontend/
@@ -64,12 +67,13 @@ logger/
 │   │   ├── pages/
 │   │   │   ├── Home.tsx         # Landing page: card grid + sidebar + filters
 │   │   │   ├── ArticlePage.tsx  # Full article with Markdown rendering
-│   │   │   ├── WritePage.tsx    # New/edit article form
+│   │   │   ├── WritePage.tsx    # New/edit article form + AI analysis button
 │   │   │   └── ImportPage.tsx   # Bulk import UI
 │   │   ├── components/
-│   │   │   ├── Header.tsx       # Sticky header with search + Write button
-│   │   │   ├── ArticleCard.tsx  # Card: hero image, category badge, tags
-│   │   │   └── Sidebar.tsx      # Category nav + tag cloud
+│   │   │   ├── Header.tsx           # Sticky header with search + Write button
+│   │   │   ├── ArticleCard.tsx      # Card: hero image, category badge, tags
+│   │   │   ├── Sidebar.tsx          # Category nav + AI classify + tag cloud
+│   │   │   └── CategoryEditModal.tsx # Add/delete categories
 │   │   ├── api/client.ts        # Fetch wrapper against FastAPI
 │   │   └── types.ts             # Shared TypeScript types
 │   ├── vite.config.ts           # Proxy /api and /static → localhost:8000
@@ -79,7 +83,8 @@ logger/
 │   └── setup.md             # Step-by-step CloudFlare tunnel setup guide
 ├── docs/
 │   └── plan.md              # Architecture and design decisions
-├── start.sh                 # Start both servers with one command
+├── setup.sh                 # First-time setup (deps + Ollama + model pull)
+├── start.sh                 # Start Ollama + both servers with one command
 └── .gitignore
 ```
 
@@ -104,87 +109,46 @@ backend/data/
             └── 9cd1_photo2.jpg
 ```
 
-`article.json` schema:
-```json
-{
-  "slug": "2024-01-15-yamaha-sr400-custom-a1b2",
-  "title": "Yamaha SR400 Custom",
-  "body": "## Intro\n...",
-  "heroImage": "hero.jpg",
-  "additionalImages": ["images/8fa3_photo1.jpg"],
-  "categories": ["bike"],
-  "tags": ["yamaha", "sr400", "custom"],
-  "publishedAt": "2024-01-15T10:00:00",
-  "sourceUrl": "https://www.scrambler-lab.com/bike/..."
-}
-```
-
-**Back this directory up separately.** It is excluded from git. See the [Backup & Restore](#backup--restore) section below.
+**Back this directory up separately.** See the [Backup & Restore](#backup--restore) section below.
 
 ---
 
 ## Backup & Restore
 
-> **Why this matters:** the WordPress sites will be deprecated. Once they go offline, `backend/data/` is the only copy of all article content. A corrupted drive or accidental `rm -rf` with no backup means permanent data loss.
+> **Why this matters:** the WordPress sites will be deprecated. Once they go offline, `backend/data/` is the only copy of all article content.
 
 ### What needs to be backed up
 
-| Path | Contents | Size |
-|---|---|---|
-| `backend/data/blog.db` | SQLite DB — all articles, categories, tags | small (grows with content) |
-| `backend/data/articles/` | One folder per article: `article.json` + images | ~86 MB and growing |
-
-Both must be backed up together. The JSON files and the DB are the authoritative sources — if one is lost without the other, recovery is partial (see restore notes below).
+| Path | Contents |
+|---|---|
+| `backend/data/blog.db` | SQLite DB — all articles, categories, tags |
+| `backend/data/articles/` | One folder per article: `article.json` + images |
 
 ### Option A — Google Drive via rclone (recommended)
 
-[rclone](https://rclone.org/) is a command-line tool that syncs any local folder to Google Drive (and 40+ other cloud storage providers). It handles incremental sync, so only changed files are uploaded after the first run.
-
-**One-time setup:**
 ```bash
 brew install rclone
 rclone config
-# → Choose "n" (new remote) → name it "gdrive"
-# → Choose Google Drive → follow the browser OAuth flow
-# → Accept default scope (full drive access)
-```
+# → name it "gdrive", choose Google Drive, follow OAuth flow
 
-**Manual backup:**
-```bash
+# Manual backup
 rclone sync /Users/nobu/dev/ai/logger/backend/data/ gdrive:logger-backup/data/ --progress
-```
 
-**Automated daily backup via cron:**
-```bash
+# Automated daily backup (3 AM)
 crontab -e
-# Add this line (runs at 3 AM every day):
-0 3 * * * /opt/homebrew/bin/rclone sync /Users/nobu/dev/ai/logger/backend/data/ gdrive:logger-backup/data/ --log-file=/tmp/logger-backup.log
+# Add: 0 3 * * * /opt/homebrew/bin/rclone sync /Users/nobu/dev/ai/logger/backend/data/ gdrive:logger-backup/data/ --log-file=/tmp/logger-backup.log
 ```
 
-After the first sync, Google Drive will contain:
-```
-logger-backup/
-└── data/
-    ├── blog.db
-    └── articles/
-        └── ...
-```
-
-### Option B — Google Drive for Desktop (simpler, less control)
-
-If you have [Google Drive for Desktop](https://www.google.com/drive/download/) installed and your Drive is mounted at `~/Library/CloudStorage/GoogleDrive-*/`:
+### Option B — Google Drive for Desktop
 
 ```bash
-# Create a symlink so Drive auto-syncs the data folder
 ln -s /Users/nobu/dev/ai/logger/backend/data \
       ~/Library/CloudStorage/GoogleDrive-scramblerlab@gmail.com/My\ Drive/logger-backup
 ```
 
-This keeps a live mirror in Google Drive with no cron needed, but gives less control over sync timing and excludes nothing.
-
 ### Option C — Time Machine (local, always-on)
 
-Time Machine backs up `backend/data/` automatically as long as the project is under your home directory. Useful as a secondary layer but not a substitute for off-machine backup.
+Automatic as long as the project is under your home directory. Secondary layer only.
 
 ---
 
@@ -193,39 +157,24 @@ Time Machine backs up `backend/data/` automatically as long as the project is un
 **Full restore (DB + files intact):**
 
 ```bash
-# 1. Clone the repo
 git clone <this-repo> logger && cd logger
-
-# 2. Download backup from Google Drive
 rclone sync gdrive:logger-backup/data/ backend/data/ --progress
-
-# 3. Install dependencies (see Getting Started)
-cd backend && uv venv .venv --python 3.12 && uv pip install -r requirements.txt
-cd ../frontend && npm install
-
-# 4. Set API key
-echo 'ANTHROPIC_API_KEY=sk-ant-...' >> backend/.env
-
-# 5. Start — init_db() re-creates schema if needed, DB rows are already in blog.db
-cd .. && ./start.sh
+./setup.sh        # installs deps + Ollama + pulls model
+./start.sh
 ```
 
-The app will start with all articles intact.
-
 **Partial restore (JSON files only, DB lost):**
-
-If `blog.db` is lost but the `articles/` folder is intact, run the re-import script:
 
 ```bash
 cd backend
 .venv/bin/python rebuild_db.py   # not yet implemented — see note below
 ```
 
-> This script does not exist yet. If needed, it would iterate every `article.json` under `data/articles/`, parse the fields, and `INSERT OR IGNORE` into the `articles` table. A straightforward migration that can be written in ~30 lines when required.
+> `rebuild_db.py` does not exist yet. If needed, it would iterate every `article.json` under `data/articles/`, parse the fields, and `INSERT OR IGNORE` into the `articles` table (~30 lines).
 
 **Full loss (no backup):**
 
-Re-run the bulk import from scratch via the Import page. All 6 WordPress sections are still accessible at their current URLs until the sites are taken down. AI classification will re-run on each article. Locally authored articles (not imported from WordPress) cannot be recovered without a backup.
+Re-run bulk import from the Import page. All 6 WordPress sections remain accessible at their current URLs until the sites are taken down. AI classification will re-run on each article. Locally authored articles cannot be recovered without a backup.
 
 ---
 
@@ -236,40 +185,29 @@ Re-run the bulk import from scratch via the Import page. All 6 WordPress section
 - macOS (tested on Apple Silicon)
 - Python 3.12 via [`uv`](https://github.com/astral-sh/uv) (`brew install uv`)
 - Node.js 18+ and npm
-- An [Anthropic API key](https://console.anthropic.com/)
+- [Homebrew](https://brew.sh/)
 
-### 1 — Clone and configure
+### 1 — Clone and run setup
 
 ```bash
 git clone <this-repo> logger
 cd logger
-
-# Add your Anthropic API key
-echo 'ANTHROPIC_API_KEY=sk-ant-...' >> backend/.env
+./setup.sh
 ```
 
-### 2 — Install backend dependencies
+`setup.sh` handles everything in one pass:
+1. Creates Python venv and installs backend dependencies
+2. Copies `backend/.env.example` → `backend/.env` (if not present)
+3. Runs `npm install` for the frontend
+4. Installs Ollama (via Homebrew), starts `ollama serve`, and pulls the configured model
 
-```bash
-cd backend
-uv venv .venv --python 3.12
-uv pip install -r requirements.txt
-cd ..
-```
-
-### 3 — Install frontend dependencies
-
-```bash
-cd frontend
-npm install
-cd ..
-```
-
-### 4 — Start
+### 2 — Start
 
 ```bash
 ./start.sh
 ```
+
+`start.sh` checks that Ollama is running and the model is available, then starts both servers.
 
 | Server | URL |
 |---|---|
@@ -278,6 +216,36 @@ cd ..
 | API docs (Swagger) | http://localhost:8000/docs |
 
 > The backend creates `backend/data/blog.db` and seeds the 10 categories on first run.
+
+---
+
+## AI Classification
+
+The app uses a **local Ollama model** for all AI features — no cloud API, no usage fees.
+
+### Configuration (`backend/.env`)
+
+```
+OLLAMA_BASE_URL=http://localhost:11434   # default
+OLLAMA_MODEL=gemma4:e2b-mlx             # Apple Silicon MLX variant (~7.1 GB)
+```
+
+Other available models (set `OLLAMA_MODEL` and run `ollama pull <model>`):
+
+| Model | Size | Notes |
+|---|---|---|
+| `gemma4:e2b-mlx` | 7.1 GB | **Recommended** — Apple Silicon optimised |
+| `gemma4:e2b` | 7.2 GB | Standard (non-MLX) |
+| `gemma4:e4b` | 9.6 GB | Larger, slower, slightly better quality |
+| `gemma4:e4b-mlx` | 9.6 GB | MLX variant of e4b |
+
+### How it's used
+
+**Per-article (Write / Edit page):**
+Click **✦ AI分析** to analyse the current title + body and fill in suggested categories and tags. Review and adjust before saving.
+
+**Bulk classify (Sidebar / LP):**
+Click **AI分類** to run classification on every article that has no category assigned yet. Progress streams live. Categories and tags (3–5 keywords) are written to the DB and `article.json`.
 
 ---
 
@@ -301,7 +269,19 @@ cd ..
 | `/cooking/` | `/cooking/wp-json/wp/v2/` | 43 |
 | `/lens/` | `/lens/wp-json/wp/v2/` | 18 |
 
-The importer auto-detects the WP installation root by probing path prefixes (`_detect_wp_base`), then fetches posts with `_embed=wp:featuredmedia` to inline hero images. Falls back to sitemap parsing then HTML scraping if the REST API is unavailable.
+The importer auto-detects the WP installation root (`_detect_wp_base`), fetches posts with `_embed=wp:featuredmedia` to inline hero images, and downloads all body images. Falls back to sitemap parsing then HTML scraping if the REST API is unavailable.
+
+---
+
+## Category Management
+
+From the sidebar (desktop) or the action bar (mobile):
+
+- **AI分類** — bulk-classify all uncategorized articles. Article counts update automatically when done.
+- **編集** — opens the category editor modal:
+  - Shows all current categories with article counts
+  - Delete a category (articles lose that category; no cascade delete)
+  - Add a new category: English name (used as slug), Japanese name, color swatch
 
 ---
 
@@ -329,9 +309,13 @@ Once running, the app is accessible at your chosen hostname (e.g., `https://log.
 | `GET` | `/api/articles` | List articles (`?category=bike&tag=bmw&page=1&limit=20`) |
 | `GET` | `/api/articles/{slug}` | Full article |
 | `POST` | `/api/articles` | Create article (multipart form + images) |
-| `PUT` | `/api/articles/{slug}` | Update article |
+| `PUT` | `/api/articles/{slug}` | Update article (multipart — text + optional image replacement) |
 | `DELETE` | `/api/articles/{slug}` | Delete article + files |
-| `GET` | `/api/categories` | List categories |
+| `POST` | `/api/articles/ai-classify` | Classify a single article (`{title, body}`) |
+| `POST` | `/api/articles/ai-categorize` | Bulk classify all uncategorized articles (SSE stream) |
+| `GET` | `/api/categories` | List categories with article counts |
+| `POST` | `/api/categories` | Create category |
+| `DELETE` | `/api/categories/{slug}` | Delete category (strips from articles) |
 | `GET` | `/api/categories/tags` | Tag list with counts |
 | `GET` | `/api/search?q=...` | FTS5 full-text search |
 | `POST` | `/api/import/analyze` | Preview import from a WordPress URL |
