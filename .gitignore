@@ -1,0 +1,20 @@
+# Python virtual environment
+backend/.venv/
+
+# Imported article data — all article JSON + images live here (733+ articles, ~86 MB+)
+# Back this up separately; do NOT commit to git.
+backend/data/
+
+# Secrets
+backend/.env
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+
+# Python cache
+*.pyc
+__pycache__/
+
+# macOS
+.DS_Store

@@ -1,0 +1,61 @@
+import os
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import DeclarativeBase
+
+DATA_DIR = os.getenv("DATA_DIR", "./data")
+DB_PATH = os.path.join(DATA_DIR, "blog.db")
+
+engine = create_async_engine(f"sqlite+aiosqlite:///{DB_PATH}", echo=False)
+SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+async def get_db() -> AsyncSession:
+    async with SessionLocal() as session:
+        yield session
+
+
+CATEGORIES_SEED = [
+    {"slug": "bike",      "name_en": "Bike",      "name_ja": "バイク",   "color": "#E84040"},
+    {"slug": "onsen",     "name_en": "Onsen",     "name_ja": "温泉",     "color": "#4A90D9"},
+    {"slug": "sentou",    "name_en": "Sento",     "name_ja": "銭湯",     "color": "#7B68EE"},
+    {"slug": "container", "name_en": "Container", "name_ja": "コンテナ", "color": "#F5A623"},
+    {"slug": "cooking",   "name_en": "Cooking",   "name_ja": "料理",     "color": "#7ED321"},
+    {"slug": "lens",      "name_en": "Lens",      "name_ja": "レンズ",   "color": "#9B59B6"},
+    {"slug": "sauna",     "name_en": "Sauna",     "name_ja": "サウナ",   "color": "#FF6B35"},
+    {"slug": "auto",      "name_en": "Auto",      "name_ja": "4輪",      "color": "#2ECC71"},
+    {"slug": "diy",       "name_en": "DIY",       "name_ja": "DIY",      "color": "#95A5A6"},
+    {"slug": "beer",      "name_en": "Beer",      "name_ja": "ビール",   "color": "#F39C12"},
+]
+
+
+async def init_db():
+    import os as _os
+    _os.makedirs(DATA_DIR, exist_ok=True)
+    _os.makedirs(os.path.join(DATA_DIR, "articles"), exist_ok=True)
+
+    from models import Base as _Base, Category, Tag
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        await conn.run_sync(_Base.metadata.create_all)
+
+        # FTS5 virtual table for full-text search
+        await conn.execute(text("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts
+            USING fts5(title, body, content=articles, content_rowid=rowid)
+        """))
+
+    # Seed categories
+    async with SessionLocal() as session:
+        from sqlalchemy import select
+        for cat in CATEGORIES_SEED:
+            result = await session.execute(
+                select(Category).where(Category.slug == cat["slug"])
+            )
+            if not result.scalar_one_or_none():
+                session.add(Category(**cat))
+        await session.commit()

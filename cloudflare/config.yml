@@ -1,0 +1,9 @@
+# CloudFlare Tunnel config for logger
+# Fill in TUNNEL_ID after running: cloudflared tunnel create logger
+tunnel: TUNNEL_ID
+credentials-file: /Users/nobu/.cloudflared/TUNNEL_ID.json
+
+ingress:
+  - hostname: log.scrambler-lab.com   # change to your subdomain
+    service: http://localhost:8000
+  - service: http_status:404

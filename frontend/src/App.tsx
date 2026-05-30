@@ -1,0 +1,34 @@
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import Header from './components/Header';
+import Home from './pages/Home';
+import ArticlePage from './pages/ArticlePage';
+import WritePage from './pages/WritePage';
+import ImportPage from './pages/ImportPage';
+
+function AppInner() {
+  const navigate = useNavigate();
+
+  const handleSearch = (q: string) => {
+    navigate(`/?q=${encodeURIComponent(q)}`);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header onSearch={handleSearch} />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/articles/:slug" element={<ArticlePage />} />
+        <Route path="/write" element={<WritePage />} />
+        <Route path="/import" element={<ImportPage />} />
+      </Routes>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppInner />
+    </BrowserRouter>
+  );
+}
