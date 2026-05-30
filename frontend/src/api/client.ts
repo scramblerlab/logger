@@ -3,7 +3,7 @@ import type { Article, ArticleCard, ArticleListResponse, Category, CategoryCreat
 const BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, options);
+  const res = await fetch(`${BASE}${path}`, { credentials: 'include', ...options });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -52,6 +52,17 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       }),
+  },
+  auth: {
+    login: (email: string, password: string) =>
+      fetch(`${BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
+      }),
+    logout: () => fetch(`${BASE}/auth/logout`, { method: 'POST', credentials: 'include' }),
+    verify: () => fetch(`${BASE}/auth/verify`, { method: 'POST', credentials: 'include' }),
   },
 };
 

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth import get_current_user
 from database import get_db
 from models import Category, Article
 from schemas import CategoryOut, TagOut, CategoryCreate
@@ -43,7 +44,7 @@ async def list_tags(limit: int = 50, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=CategoryOut, status_code=201)
-async def create_category(body: CategoryCreate, db: AsyncSession = Depends(get_db)):
+async def create_category(body: CategoryCreate, db: AsyncSession = Depends(get_db), _: str = Depends(get_current_user)):
     existing = await db.execute(select(Category).where(Category.slug == body.slug))
     if existing.scalar_one_or_none():
         raise HTTPException(409, f"Category '{body.slug}' already exists")
@@ -61,7 +62,7 @@ async def create_category(body: CategoryCreate, db: AsyncSession = Depends(get_d
 
 
 @router.delete("/{slug}", status_code=204)
-async def delete_category(slug: str, db: AsyncSession = Depends(get_db)):
+async def delete_category(slug: str, db: AsyncSession = Depends(get_db), _: str = Depends(get_current_user)):
     cat = (await db.execute(select(Category).where(Category.slug == slug))).scalar_one_or_none()
     if not cat:
         raise HTTPException(404, "Category not found")

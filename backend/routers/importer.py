@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from slugify import slugify
 
+from auth import get_current_user
 from database import get_db
 from models import Article, Tag
 from schemas import ImportAnalyzeRequest, ImportAnalyzeResponse, ImportRunRequest
@@ -23,7 +24,7 @@ async def analyze_site(req: ImportAnalyzeRequest):
 
 
 @router.post("/run")
-async def run_import(req: ImportRunRequest, db: AsyncSession = Depends(get_db)):
+async def run_import(req: ImportRunRequest, db: AsyncSession = Depends(get_db), _: str = Depends(get_current_user)):
     """SSE stream of import progress."""
 
     async def event_stream():

@@ -21,3 +21,6 @@ __pycache__/
 
 # Claude Code project settings (local only)
 .claude/
+
+# Editor credentials — plaintext passwords, never commit
+backend/editors.json
