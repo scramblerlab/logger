@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Category, Tag } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   categories: Category[];
@@ -19,29 +20,32 @@ export default function Sidebar({
   aiCategorizeStatus, aiCategorizeProgress,
   onAiCategorize, onOpenCategoryEdit,
 }: Props) {
+  const { isEditor } = useAuth();
   return (
     <aside className="w-64 flex-shrink-0 space-y-6">
       <div>
         {/* Category header */}
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">カテゴリー</h3>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={onAiCategorize}
-              disabled={aiCategorizeStatus === 'running'}
-              title="AI カテゴライズ"
-              className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold transition-colors whitespace-nowrap"
-            >
-              {aiCategorizeStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
-            </button>
-            <button
-              onClick={onOpenCategoryEdit}
-              title="カテゴリーを編集"
-              className="text-xs px-2.5 py-1 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
-            >
-              編集
-            </button>
-          </div>
+          {isEditor && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={onAiCategorize}
+                disabled={aiCategorizeStatus === 'running'}
+                title="AI カテゴライズ"
+                className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold transition-colors whitespace-nowrap"
+              >
+                {aiCategorizeStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
+              </button>
+              <button
+                onClick={onOpenCategoryEdit}
+                title="カテゴリーを編集"
+                className="text-xs px-2.5 py-1 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
+              >
+                編集
+              </button>
+            </div>
+          )}
         </div>
 
         {/* AI progress */}
@@ -102,17 +106,19 @@ export default function Sidebar({
         </div>
       )}
 
-      <div className="pt-4 border-t border-rim">
-        <Link
-          to="/import"
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-amber-400 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
-          一括インポート
-        </Link>
-      </div>
+      {isEditor && (
+        <div className="pt-4 border-t border-rim">
+          <Link
+            to="/import"
+            className="flex items-center gap-2 text-sm text-slate-500 hover:text-amber-400 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            一括インポート
+          </Link>
+        </div>
+      )}
     </aside>
   );
 }

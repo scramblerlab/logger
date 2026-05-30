@@ -9,6 +9,7 @@ from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from slugify import slugify
 
+from auth import get_current_user
 from database import get_db
 from models import Article, Tag
 from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AIClassifyResult
@@ -85,6 +86,7 @@ async def create_article(
     hero_image: Optional[UploadFile] = File(None),
     additional_images: list[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_user),
 ):
     cats = json.loads(categories)
     tag_list = json.loads(tags)
@@ -154,14 +156,14 @@ async def create_article(
 
 
 @router.post("/ai-classify", response_model=AIClassifyResult)
-async def ai_classify_single(req: AIClassifyRequest):
+async def ai_classify_single(req: AIClassifyRequest, _: str = Depends(get_current_user)):
     """Classify a single article's title+body and return suggested categories/tags."""
     result = await ai_classifier.classify(req.title, req.body)
     return AIClassifyResult(**result)
 
 
 @router.post("/ai-categorize")
-async def ai_categorize_all():
+async def ai_categorize_all(_: str = Depends(get_current_user)):
     """SSE stream: run AI classification on all uncategorized articles."""
     import os
 
@@ -245,6 +247,7 @@ async def update_article(
     hero_image: Optional[UploadFile] = File(None),
     additional_images: list[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_user),
 ):
     result = await db.execute(select(Article).where(Article.slug == slug))
     article = result.scalar_one_or_none()
@@ -320,7 +323,7 @@ async def update_article(
 
 
 @router.delete("/{slug}", status_code=204)
-async def delete_article(slug: str, db: AsyncSession = Depends(get_db)):
+async def delete_article(slug: str, db: AsyncSession = Depends(get_db), _: str = Depends(get_current_user)):
     result = await db.execute(select(Article).where(Article.slug == slug))
     article = result.scalar_one_or_none()
     if not article:

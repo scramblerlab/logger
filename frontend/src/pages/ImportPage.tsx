@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import type { ImportAnalyzeResponse } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 interface ProgressEvent {
   done?: number; total?: number; current?: string;
@@ -18,7 +19,13 @@ const PRESET_URLS = [
 ];
 
 export default function ImportPage() {
+  const navigate = useNavigate();
+  const { isEditor, isLoading } = useAuth();
   const [url, setUrl] = useState('');
+
+  useEffect(() => {
+    if (!isLoading && !isEditor) navigate('/');
+  }, [isLoading, isEditor, navigate]);
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [running, setRunning] = useState(false);

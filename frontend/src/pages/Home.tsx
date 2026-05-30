@@ -5,6 +5,7 @@ import type { ArticleCard as ArticleCardType, Category, Tag } from '../types';
 import ArticleCard from '../components/ArticleCard';
 import Sidebar from '../components/Sidebar';
 import CategoryEditModal from '../components/CategoryEditModal';
+import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 18;
 
@@ -25,6 +26,7 @@ export default function Home() {
   const activeTag = searchParams.get('tag');
   const searchQuery = searchParams.get('q');
   const loaderRef = useRef<HTMLDivElement>(null);
+  const { isEditor } = useAuth();
 
   const reloadCategories = useCallback(() => {
     api.categories.list().then(setCategories).catch(() => {});
@@ -129,25 +131,27 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Mobile: action buttons */}
-      <div className="flex flex-wrap gap-2 mb-3 lg:hidden">
-        <button
-          onClick={handleAiCategorize}
-          disabled={aiStatus === 'running'}
-          className="text-xs px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-50 transition-colors"
-        >
-          {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
-        </button>
-        <button
-          onClick={() => setShowCategoryEdit(true)}
-          className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
-        >
-          カテゴリー編集
-        </button>
-        {aiStatus !== 'idle' && aiProgress && (
-          <span className="text-xs text-amber-400 self-center">{aiProgress}</span>
-        )}
-      </div>
+      {/* Mobile: action buttons (editor only) */}
+      {isEditor && (
+        <div className="flex flex-wrap gap-2 mb-3 lg:hidden">
+          <button
+            onClick={handleAiCategorize}
+            disabled={aiStatus === 'running'}
+            className="text-xs px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-50 transition-colors"
+          >
+            {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
+          </button>
+          <button
+            onClick={() => setShowCategoryEdit(true)}
+            className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
+          >
+            カテゴリー編集
+          </button>
+          {aiStatus !== 'idle' && aiProgress && (
+            <span className="text-xs text-amber-400 self-center">{aiProgress}</span>
+          )}
+        </div>
+      )}
 
       {/* Mobile: category tabs */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-6 lg:hidden">
