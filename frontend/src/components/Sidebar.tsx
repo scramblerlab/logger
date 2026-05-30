@@ -24,20 +24,20 @@ export default function Sidebar({
       <div>
         {/* Category header */}
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">カテゴリー</h3>
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">カテゴリー</h3>
           <div className="flex items-center gap-1.5">
             <button
               onClick={onAiCategorize}
               disabled={aiCategorizeStatus === 'running'}
               title="AI カテゴライズ"
-              className="text-xs px-2.5 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-medium transition-colors whitespace-nowrap"
+              className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold transition-colors whitespace-nowrap"
             >
               {aiCategorizeStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
             </button>
             <button
               onClick={onOpenCategoryEdit}
               title="カテゴリーを編集"
-              className="text-xs px-2.5 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium transition-colors"
+              className="text-xs px-2.5 py-1 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
             >
               編集
             </button>
@@ -46,7 +46,7 @@ export default function Sidebar({
 
         {/* AI progress */}
         {aiCategorizeStatus !== 'idle' && aiCategorizeProgress && (
-          <p className="text-xs text-indigo-400 mb-2">{aiCategorizeProgress}</p>
+          <p className="text-xs text-amber-400 mb-2">{aiCategorizeProgress}</p>
         )}
 
         <ul className="space-y-0.5">
@@ -55,8 +55,8 @@ export default function Sidebar({
               onClick={() => onSelectCategory(null)}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                 !activeCategory
-                  ? 'bg-indigo-500/20 text-indigo-300 font-medium'
-                  : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                  ? 'bg-amber-500/20 text-amber-400 font-medium'
+                  : 'text-slate-400 hover:bg-surface2 hover:text-slate-100'
               }`}
             >
               すべて / All
@@ -68,15 +68,15 @@ export default function Sidebar({
                 onClick={() => onSelectCategory(cat.slug)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                   activeCategory === cat.slug
-                    ? 'bg-indigo-500/20 text-indigo-300 font-medium'
-                    : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                    ? 'bg-amber-500/20 text-amber-400 font-medium'
+                    : 'text-slate-400 hover:bg-surface2 hover:text-slate-100'
                 }`}
               >
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                 <span className="flex-1">{cat.name_ja}</span>
-                <span className="text-gray-600 text-xs">{cat.name_en}</span>
+                <span className="text-slate-600 text-xs">{cat.name_en}</span>
                 {cat.article_count > 0 && (
-                  <span className="text-xs text-gray-500 tabular-nums">{cat.article_count}</span>
+                  <span className="text-xs text-slate-500 tabular-nums">{cat.article_count}</span>
                 )}
               </button>
             </li>
@@ -86,26 +86,26 @@ export default function Sidebar({
 
       {tags.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">タグ</h3>
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">タグ</h3>
           <div className="flex flex-wrap gap-1.5">
             {tags.slice(0, 30).map((tag) => (
               <button
                 key={tag.slug}
                 onClick={() => onSelectTag(tag.name)}
-                className="text-xs bg-gray-700 hover:bg-indigo-500/30 hover:text-indigo-300 text-gray-400 px-2 py-0.5 rounded transition-colors"
+                className="text-xs bg-surface2 hover:bg-amber-500/30 hover:text-amber-400 text-slate-400 px-2 py-0.5 rounded transition-colors"
               >
                 #{tag.name}
-                <span className="ml-1 text-gray-600">{tag.article_count}</span>
+                <span className="ml-1 text-slate-600">{tag.article_count}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      <div className="pt-4 border-t border-gray-700">
+      <div className="pt-4 border-t border-rim">
         <Link
           to="/import"
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-400 transition-colors"
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-amber-400 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />

@@ -4,10 +4,17 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["'Noto Sans JP'", "sans-serif"],
+        sans: ["'Space Grotesk'", "'Noto Sans JP'", "sans-serif"],
+        display: ["'Bebas Neue'", "sans-serif"],
+      },
+      colors: {
+        canvas: '#0a0a0f',
+        surface: '#111118',
+        surface2: '#1a1a26',
+        rim: '#1e1e30',
+        rim2: '#2a2a40',
       },
     },
   },
   plugins: [require('@tailwindcss/typography')],
 }
-

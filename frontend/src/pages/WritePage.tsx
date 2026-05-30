@@ -4,7 +4,7 @@ import MDEditor from '@uiw/react-md-editor';
 import { api, heroImageUrl } from '../api/client';
 import type { Category } from '../types';
 
-const inputCls = 'w-full bg-gray-800 border border-gray-600 text-gray-100 placeholder-gray-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent';
+const inputCls = 'w-full bg-surface2 border border-rim2 text-slate-100 placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent';
 
 export default function WritePage() {
   const navigate = useNavigate();
@@ -114,11 +114,11 @@ export default function WritePage() {
     } finally { setSubmitting(false); }
   };
 
-  const labelCls = 'block text-sm font-medium text-gray-400 mb-1';
+  const labelCls = 'block text-sm font-medium text-slate-400 mb-1';
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
-      <h2 className="text-2xl font-bold text-gray-100 mb-8">{editSlug ? '記事を編集' : '新しい記事を投稿'}</h2>
+      <h2 className="font-display text-4xl tracking-wide text-slate-100 mb-8">{editSlug ? '記事を編集' : '新しい記事を投稿'}</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* Title */}
@@ -137,23 +137,23 @@ export default function WritePage() {
         <div>
           <label className={labelCls}>
             ヒーロー画像
-            {editSlug && heroPreview && !heroFile && <span className="text-xs text-gray-600 font-normal ml-2">現在の画像 (クリックで変更)</span>}
+            {editSlug && heroPreview && !heroFile && <span className="text-xs text-slate-600 font-normal ml-2">現在の画像 (クリックで変更)</span>}
           </label>
           <div
             ref={heroDrop}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleHeroDrop}
-            className="relative border-2 border-dashed border-gray-600 rounded-xl overflow-hidden cursor-pointer hover:border-indigo-500 transition-colors"
+            className="relative border-2 border-dashed border-rim2 rounded-xl overflow-hidden cursor-pointer hover:border-amber-500 transition-colors"
             style={{ minHeight: '160px' }}
             onClick={() => document.getElementById('hero-input')?.click()}
           >
             {heroPreview ? (
               <div className="relative">
                 <img src={heroPreview} alt="preview" className="w-full h-48 object-cover" />
-                {heroFile && <span className="absolute top-2 right-2 bg-indigo-500 text-white text-xs px-2 py-0.5 rounded-lg">新しい画像</span>}
+                {heroFile && <span className="absolute top-2 right-2 bg-amber-500 text-black text-xs font-semibold px-2 py-0.5 rounded-lg">新しい画像</span>}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-40 text-gray-600">
+              <div className="flex flex-col items-center justify-center h-40 text-slate-500">
                 <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
@@ -179,7 +179,7 @@ export default function WritePage() {
             <div className="flex flex-wrap gap-3">
               {existingAdditional.map((rel) => (
                 <div key={rel} className="relative group w-24 h-24">
-                  <img src={`/static/articles/${editSlug}/${rel}`} alt="" className="w-24 h-24 object-cover rounded-lg ring-1 ring-gray-600" />
+                  <img src={`/static/articles/${editSlug}/${rel}`} alt="" className="w-24 h-24 object-cover rounded-lg ring-1 ring-rim" />
                   <button type="button" onClick={() => removeExistingImage(rel)}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-600 text-white rounded-full text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                   >×</button>
@@ -194,22 +194,22 @@ export default function WritePage() {
           <label className={labelCls}>{editSlug ? '追加画像を追加' : '追加画像'}</label>
           <input type="file" accept="image/*" multiple
             onChange={(e) => setAdditionalFiles(Array.from(e.target.files ?? []))}
-            className="text-sm text-gray-400 file:mr-3 file:text-sm file:font-medium file:bg-indigo-500 file:text-white file:border-0 file:px-3 file:py-1 file:rounded-lg hover:file:bg-indigo-400 file:transition-colors"
+            className="text-sm text-slate-400 file:mr-3 file:text-sm file:font-semibold file:bg-amber-500 file:text-black file:border-0 file:px-3 file:py-1 file:rounded-full hover:file:bg-amber-400 file:transition-colors"
           />
-          {additionalFiles.length > 0 && <p className="text-xs text-gray-500 mt-1">{additionalFiles.length}件選択済み</p>}
+          {additionalFiles.length > 0 && <p className="text-xs text-slate-500 mt-1">{additionalFiles.length}件選択済み</p>}
         </div>
 
         {/* Categories */}
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <label className="text-sm font-medium text-gray-400">カテゴリー</label>
+            <label className="text-sm font-medium text-slate-400">カテゴリー</label>
             <button type="button" onClick={handleAiClassify} disabled={classifying || !title}
-              className="text-xs px-3 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white font-medium disabled:opacity-40 transition-colors"
+              className="text-xs px-3 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40 transition-colors"
             >
               {classifying ? '⏳ AI分析中...' : '✦ AI分析'}
             </button>
             {classifyMsg && (
-              <span className={`text-xs ${classifyMsg.includes('エラー') || classifyMsg.includes('できません') ? 'text-red-400' : 'text-indigo-400'}`}>
+              <span className={`text-xs ${classifyMsg.includes('エラー') || classifyMsg.includes('できません') ? 'text-red-400' : 'text-amber-400'}`}>
                 {classifyMsg}
               </span>
             )}
@@ -220,7 +220,7 @@ export default function WritePage() {
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   selectedCats.includes(cat.slug)
                     ? 'text-white border-transparent'
-                    : 'border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                    : 'border-rim text-slate-400 hover:bg-surface2 hover:text-slate-100'
                 }`}
                 style={selectedCats.includes(cat.slug) ? { backgroundColor: cat.color, borderColor: cat.color } : {}}
               >
@@ -239,14 +239,14 @@ export default function WritePage() {
               placeholder="タグを入力 → Enter" className={inputCls}
             />
             <button type="button" onClick={addTag}
-              className="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium rounded-lg border border-gray-600 transition-colors"
+              className="px-4 py-2 text-sm bg-surface2 hover:bg-rim text-slate-300 font-medium rounded-lg border border-rim transition-colors"
             >追加</button>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-1 text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">
+              <span key={tag} className="inline-flex items-center gap-1 text-xs bg-surface2 text-slate-300 px-2 py-0.5 rounded-full">
                 #{tag}
-                <button type="button" onClick={() => setTags((p) => p.filter((t) => t !== tag))} className="text-gray-500 hover:text-red-400 transition-colors">×</button>
+                <button type="button" onClick={() => setTags((p) => p.filter((t) => t !== tag))} className="text-slate-500 hover:text-red-400 transition-colors">×</button>
               </span>
             ))}
           </div>
@@ -255,12 +255,12 @@ export default function WritePage() {
         {/* Submit */}
         <div className="flex gap-3 pt-2">
           <button type="submit" disabled={submitting}
-            className="flex-1 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors"
+            className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-3 rounded-full transition-colors"
           >
             {submitting ? '投稿中...' : editSlug ? '更新する' : '投稿する'}
           </button>
           <button type="button" onClick={() => navigate(-1)}
-            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium rounded-xl border border-gray-600 transition-colors"
+            className="px-6 py-3 bg-surface2 hover:bg-rim text-slate-300 font-medium rounded-xl border border-rim transition-colors"
           >
             キャンセル
           </button>
