@@ -4,6 +4,7 @@ export interface Category {
   name_en: string;
   name_ja: string;
   color: string;
+  article_count: number;
 }
 
 export interface Tag {
@@ -44,4 +45,11 @@ export interface ImportAnalyzeResponse {
   sample_titles: string[];
   detected_categories: string[];
   method: string;
+}
+
+export interface CategoryCreate {
+  slug: string;
+  name_en: string;
+  name_ja: string;
+  color: string;
 }

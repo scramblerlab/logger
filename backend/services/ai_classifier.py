@@ -1,63 +1,66 @@
+"""
+AI classifier using a local Ollama model.
+Configure via backend/.env: OLLAMA_BASE_URL, OLLAMA_MODEL.
+"""
 import json
 import os
-from typing import Optional
-
-import anthropic
 
 KNOWN_CATEGORIES = [
     "bike", "onsen", "sentou", "container", "cooking",
     "lens", "sauna", "auto", "diy", "beer",
 ]
 
-_client: Optional[anthropic.AsyncAnthropic] = None
+_CATS_LIST = "\n".join(f"- {c}" for c in KNOWN_CATEGORIES)
 
+SYSTEM_PROMPT = f"""You are a classifier for a Japanese lifestyle blog.
 
-def get_client() -> anthropic.AsyncAnthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    return _client
+You MUST choose categories ONLY from this exact list (use the slugs as-is):
+{_CATS_LIST}
 
+You MUST respond with ONLY a JSON object — no markdown, no explanation, nothing else.
+Pick 1-3 categories that best match. Add exactly 3-5 lowercase tag keywords.
 
-SYSTEM_PROMPT = f"""You are a blog post classifier for a Japanese lifestyle blog.
-
-Predefined categories (choose 1-3 that best fit):
-{", ".join(KNOWN_CATEGORIES)}
-
-Category meanings:
-- bike: motorcycles, riding, moto touring
-- onsen: hot springs, ryokan, onsen towns
-- sentou: public baths (銭湯), neighborhood bathhouses
-- container: container houses, tiny homes, DIY shelter builds
-- cooking: food, recipes, cooking, restaurants
-- lens: photography, cameras, lenses, photo trips
-- sauna: sauna culture, sauna facilities
-- auto: cars, driving, 4-wheel vehicles
-- diy: DIY projects, crafts, workshop builds (non-container)
-- beer: beer, craft beer, bars, drinking
-
-Return ONLY valid JSON with no extra text:
-{{"categories": ["slug1"], "tags": ["tag1", "tag2", "tag3"]}}
-
-Tags should be 3-8 specific keywords relevant to the article (Japanese or English, lowercase).
-"""
+Required format (example):
+{{"categories":["bike"],"tags":["yamaha","sr400","custom"]}}"""
 
 
 async def classify(title: str, body_excerpt: str) -> dict:
-    client = get_client()
+    import httpx
+
+    base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    model = os.getenv("OLLAMA_MODEL", "gemma4:e2b-mlx")
     prompt = f"Title: {title}\n\nContent excerpt:\n{body_excerpt[:800]}"
 
-    try:
-        message = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=256,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
+    async with httpx.AsyncClient(timeout=120) as client:
+        r = await client.post(
+            f"{base}/api/chat",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                "stream": False,
+            },
         )
-        raw = message.content[0].text.strip()
-        result = json.loads(raw)
-        cats = [c for c in result.get("categories", []) if c in KNOWN_CATEGORIES]
-        tags = [str(t).lower().strip() for t in result.get("tags", []) if t][:10]
-        return {"categories": cats, "tags": tags}
-    except Exception:
+        r.raise_for_status()
+        raw = r.json()["message"]["content"].strip()
+
+    # Extract the first {...} block in case the model adds surrounding text
+    import re
+    m = re.search(r'\{.*\}', raw, re.DOTALL)
+    if not m:
         return {"categories": [], "tags": []}
+    result = json.loads(m.group())
+
+    cats_raw = result.get("categories", [])
+    if isinstance(cats_raw, str):
+        cats_raw = [cats_raw]
+    cats = [c for c in cats_raw if c in KNOWN_CATEGORIES]
+
+    tags_raw = result.get("tags", [])
+    if isinstance(tags_raw, str):
+        tags_raw = [tags_raw]
+    tags = [str(t).lower().strip() for t in tags_raw if t][:5]
+
+    return {"categories": cats, "tags": tags}

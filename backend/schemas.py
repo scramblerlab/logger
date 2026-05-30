@@ -11,6 +11,7 @@ class CategoryOut(BaseModel):
     name_en: str
     name_ja: str
     color: str
+    article_count: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -81,6 +82,18 @@ class ArticleListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class CategoryCreate(BaseModel):
+    slug: str
+    name_en: str
+    name_ja: str
+    color: str = "#888888"
+
+
+class AIClassifyRequest(BaseModel):
+    title: str
+    body: str = ""
 
 
 class AIClassifyResult(BaseModel):

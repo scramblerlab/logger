@@ -16,10 +16,7 @@ export default function ArticlePage() {
   useEffect(() => {
     if (!slug) return;
     Promise.all([api.articles.get(slug), api.categories.list()])
-      .then(([art, cats]) => {
-        setArticle(art);
-        setCategories(cats);
-      })
+      .then(([art, cats]) => { setArticle(art); setCategories(cats); })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
   }, [slug, navigate]);
@@ -27,7 +24,7 @@ export default function ArticlePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -47,12 +44,12 @@ export default function ArticlePage() {
 
   return (
     <article className="max-w-3xl mx-auto px-4 py-10">
-      <Link to="/" className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-indigo-600 mb-6">
+      <Link to="/" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-400 mb-6 transition-colors">
         ← 一覧に戻る
       </Link>
 
       {imgUrl && (
-        <div className="rounded-2xl overflow-hidden mb-8 shadow-lg">
+        <div className="rounded-2xl overflow-hidden mb-8 shadow-2xl">
           <img src={imgUrl} alt={article.title} className="w-full object-cover max-h-96" />
         </div>
       )}
@@ -66,13 +63,13 @@ export default function ArticlePage() {
       </div>
 
       <div className="flex items-start justify-between gap-4 mb-2">
-        <h1 className="text-3xl font-bold text-gray-900 leading-tight flex-1">
+        <h1 className="text-3xl font-bold text-gray-100 leading-tight flex-1">
           {showJa && article.title_ja ? article.title_ja : article.title}
         </h1>
         {article.title_ja && article.title_ja !== article.title && (
           <button
             onClick={() => setShowJa((v) => !v)}
-            className="flex-shrink-0 text-xs border border-gray-200 text-gray-500 px-2 py-1 rounded hover:bg-gray-50 transition-colors mt-1"
+            className="flex-shrink-0 text-xs bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-400 px-2 py-1 rounded-lg transition-colors mt-1"
           >
             {showJa ? 'EN' : 'JA'}
           </button>
@@ -80,28 +77,43 @@ export default function ArticlePage() {
       </div>
 
       <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-gray-400">{date}</p>
+        <p className="text-sm text-gray-500">{date}</p>
         <div className="flex gap-2">
-          <Link to={`/write?edit=${article.slug}`} className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">編集</Link>
-          <button onClick={handleDelete} className="text-xs text-gray-400 hover:text-red-500 transition-colors">削除</button>
+          <Link
+            to={`/write?edit=${article.slug}`}
+            className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg font-medium transition-colors"
+          >
+            編集
+          </Link>
+          <button
+            onClick={handleDelete}
+            className="text-xs bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+          >
+            削除
+          </button>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-8">
         {article.tags.map((tag) => (
-          <Link key={tag} to={`/?tag=${encodeURIComponent(tag)}`} className="text-xs bg-gray-100 hover:bg-indigo-100 hover:text-indigo-700 text-gray-500 px-2 py-0.5 rounded transition-colors">
+          <Link key={tag} to={`/?tag=${encodeURIComponent(tag)}`}
+            className="text-xs bg-gray-700 hover:bg-indigo-500/30 hover:text-indigo-300 text-gray-400 px-2 py-0.5 rounded transition-colors"
+          >
             #{tag}
           </Link>
         ))}
       </div>
 
-      <div className="prose prose-gray max-w-none prose-img:rounded-lg prose-a:text-indigo-600 prose-headings:font-bold">
+      <div className="prose prose-invert max-w-none prose-a:text-indigo-400 prose-img:rounded-xl prose-code:text-indigo-300 prose-pre:bg-gray-700">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
             img: ({ src, alt }) => {
-              const fullSrc = src?.startsWith('http') ? src : `/static/articles/${article.slug}/${src}`;
-              return <img src={fullSrc} alt={alt} className="rounded-lg shadow-md my-4 w-full" loading="lazy" />;
+              const fullSrc =
+                src?.startsWith('http') || src?.startsWith('/')
+                  ? src
+                  : `/static/articles/${article.slug}/${src}`;
+              return <img src={fullSrc} alt={alt} className="rounded-xl shadow-lg my-4 w-full" loading="lazy" />;
             },
           }}
         >
@@ -110,8 +122,8 @@ export default function ArticlePage() {
       </div>
 
       {article.source_url && (
-        <div className="mt-10 pt-6 border-t border-gray-100 text-xs text-gray-400">
-          インポート元: <a href={article.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline">{article.source_url}</a>
+        <div className="mt-10 pt-6 border-t border-gray-700 text-xs text-gray-600">
+          インポート元: <a href={article.source_url} target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 hover:underline transition-colors">{article.source_url}</a>
         </div>
       )}
     </article>
