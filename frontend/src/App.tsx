@@ -13,7 +13,7 @@ function AppInner() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-canvas">
       <Header onSearch={handleSearch} />
       <Routes>
         <Route path="/" element={<Home />} />

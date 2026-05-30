@@ -2,11 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
-
 body {
-  @apply bg-gray-50 text-gray-800;
-  font-family: 'Noto Sans JP', sans-serif;
+  @apply bg-canvas text-slate-100;
+  font-family: 'Space Grotesk', 'Noto Sans JP', sans-serif;
 }
 
 .prose img {

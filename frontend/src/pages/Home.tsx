@@ -134,18 +134,18 @@ export default function Home() {
         <button
           onClick={handleAiCategorize}
           disabled={aiStatus === 'running'}
-          className="text-xs px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white font-medium disabled:opacity-50 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-50 transition-colors"
         >
           {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
         </button>
         <button
           onClick={() => setShowCategoryEdit(true)}
-          className="text-xs px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
         >
           カテゴリー編集
         </button>
         {aiStatus !== 'idle' && aiProgress && (
-          <span className="text-xs text-indigo-400 self-center">{aiProgress}</span>
+          <span className="text-xs text-amber-400 self-center">{aiProgress}</span>
         )}
       </div>
 
@@ -153,8 +153,8 @@ export default function Home() {
       <div className="flex gap-2 overflow-x-auto pb-2 mb-6 lg:hidden">
         <button
           onClick={() => handleSelectCategory(null)}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-            !activeCategory ? 'bg-indigo-500 text-white' : 'bg-gray-800 text-gray-400 border border-gray-600 hover:bg-gray-700'
+          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+            !activeCategory ? 'bg-amber-500 text-black' : 'bg-surface text-slate-400 border border-rim hover:bg-surface2'
           }`}
         >
           All
@@ -163,8 +163,8 @@ export default function Home() {
           <button
             key={c.slug}
             onClick={() => handleSelectCategory(c.slug)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              activeCategory === c.slug ? 'text-white' : 'bg-gray-800 text-gray-400 border border-gray-600 hover:bg-gray-700'
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              activeCategory === c.slug ? 'text-white' : 'bg-surface text-slate-400 border border-rim hover:bg-surface2'
             }`}
             style={activeCategory === c.slug ? { backgroundColor: c.color } : {}}
           >
@@ -190,19 +190,19 @@ export default function Home() {
         <main className="flex-1 min-w-0">
           {searchQuery && (
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm text-gray-400">「{searchQuery}」の検索結果: {displayedArticles.length}件</p>
-              <button onClick={() => setSearchParams({})} className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">クリア</button>
+              <p className="text-sm text-slate-400">「{searchQuery}」の検索結果: {displayedArticles.length}件</p>
+              <button onClick={() => setSearchParams({})} className="text-sm text-amber-400 hover:text-amber-300 transition-colors">クリア</button>
             </div>
           )}
           {activeTag && (
             <div className="mb-4 flex items-center gap-2">
-              <span className="text-sm text-gray-400">タグ: #{activeTag}</span>
-              <button onClick={() => { const n = new URLSearchParams(searchParams); n.delete('tag'); setSearchParams(n); }} className="text-xs text-gray-500 hover:text-red-400 transition-colors">×</button>
+              <span className="text-sm text-slate-400">タグ: #{activeTag}</span>
+              <button onClick={() => { const n = new URLSearchParams(searchParams); n.delete('tag'); setSearchParams(n); }} className="text-xs text-slate-500 hover:text-red-400 transition-colors">×</button>
             </div>
           )}
 
           {displayedArticles.length === 0 && !loading ? (
-            <div className="text-center py-20 text-gray-600">
+            <div className="text-center py-20 text-slate-500">
               <p className="text-lg">記事がありません</p>
               <p className="text-sm mt-2">Write a new article or import from an existing site</p>
             </div>
@@ -215,7 +215,7 @@ export default function Home() {
           )}
 
           <div ref={loaderRef} className="h-10 flex items-center justify-center mt-6">
-            {loading && <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />}
+            {loading && <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />}
           </div>
         </main>
       </div>
