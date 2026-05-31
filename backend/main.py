@@ -13,12 +13,14 @@ from slowapi.errors import RateLimitExceeded
 from database import init_db, DATA_DIR
 from routers import articles, categories, search, importer, auth
 from routers.auth import limiter
+from services import task_manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     yield
+    await task_manager.cancel()
 
 
 app = FastAPI(title="logger", lifespan=lifespan)

@@ -6,6 +6,7 @@ import ArticleCard from '../components/ArticleCard';
 import Sidebar from '../components/Sidebar';
 import CategoryEditModal from '../components/CategoryEditModal';
 import { useAuth } from '../context/AuthContext';
+import { useAiJob } from '../context/AiJobContext';
 
 const PAGE_SIZE = 18;
 
@@ -19,14 +20,13 @@ export default function Home() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [searchResults, setSearchResults] = useState<ArticleCardType[] | null>(null);
   const [showCategoryEdit, setShowCategoryEdit] = useState(false);
-  const [aiStatus, setAiStatus] = useState<'idle' | 'running' | 'done'>('idle');
-  const [aiProgress, setAiProgress] = useState('');
 
   const activeCategory = searchParams.get('category');
   const activeTag = searchParams.get('tag');
   const searchQuery = searchParams.get('q');
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor } = useAuth();
+  const { status: aiStatus, progress: aiProgress, startJob, setOnComplete } = useAiJob();
 
   const reloadCategories = useCallback(() => {
     api.categories.list().then(setCategories).catch(() => {});
@@ -59,6 +59,13 @@ export default function Home() {
   }, [activeCategory, activeTag, searchQuery]);
 
   useEffect(() => {
+    setOnComplete(() => {
+      loadArticles(true);
+      reloadCategories();
+    });
+  }, [setOnComplete, loadArticles, reloadCategories]);
+
+  useEffect(() => {
     const el = loaderRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -69,55 +76,6 @@ export default function Home() {
     return () => observer.disconnect();
   }, [loading, articles.length, total, searchResults, loadArticles]);
 
-  const handleAiCategorize = async () => {
-    setAiStatus('running');
-    setAiProgress('AI分類を開始中...');
-    let completed = false;
-    try {
-      const res = await api.articles.aiCategorize();
-      if (!res.body) return;
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data:')) continue;
-          try {
-            const evt = JSON.parse(line.slice(5).trim());
-            if (evt.type === 'progress') {
-              setAiProgress(`AI分類中... ${evt.done + 1}/${evt.total}`);
-            } else if (evt.type === 'done') {
-              const msg = evt.total === 0
-                ? '未分類の記事はありません'
-                : evt.failed > 0
-                  ? `完了: ${evt.updated}/${evt.total}件を分類 (${evt.failed}件失敗)`
-                  : `完了: ${evt.updated}/${evt.total}件を分類しました`;
-              setAiProgress(msg);
-              setAiStatus('done');
-              completed = true;
-              loadArticles(true);
-              reloadCategories();
-            } else if (evt.type === 'article_error') {
-              setAiProgress((p) => `${p} ⚠ ${evt.title}`);
-            } else if (evt.type === 'error') {
-              setAiProgress(`エラー: ${evt.message}`);
-              setAiStatus('idle');
-              completed = true;
-            }
-          } catch { /* malformed line */ }
-        }
-      }
-    } catch {
-      setAiProgress('エラーが発生しました');
-    } finally {
-      if (!completed) setAiStatus('idle');
-    }
-  };
 
   const displayedArticles = searchResults ?? articles;
 
@@ -141,7 +99,7 @@ export default function Home() {
       {isEditor && (
         <div className="flex flex-wrap gap-2 mb-3 lg:hidden">
           <button
-            onClick={handleAiCategorize}
+            onClick={startJob}
             disabled={aiStatus === 'running'}
             className="text-xs px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-50 transition-colors"
           >
@@ -190,9 +148,6 @@ export default function Home() {
             activeCategory={activeCategory}
             onSelectCategory={handleSelectCategory}
             onSelectTag={handleSelectTag}
-            aiCategorizeStatus={aiStatus}
-            aiCategorizeProgress={aiProgress}
-            onAiCategorize={handleAiCategorize}
             onOpenCategoryEdit={() => setShowCategoryEdit(true)}
           />
         </div>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Category, Tag } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useAiJob } from '../context/AiJobContext';
 
 interface Props {
   categories: Category[];
@@ -8,19 +9,16 @@ interface Props {
   activeCategory: string | null;
   onSelectCategory: (slug: string | null) => void;
   onSelectTag: (tag: string) => void;
-  aiCategorizeStatus: 'idle' | 'running' | 'done';
-  aiCategorizeProgress: string;
-  onAiCategorize: () => void;
   onOpenCategoryEdit: () => void;
 }
 
 export default function Sidebar({
   categories, tags, activeCategory,
   onSelectCategory, onSelectTag,
-  aiCategorizeStatus, aiCategorizeProgress,
-  onAiCategorize, onOpenCategoryEdit,
+  onOpenCategoryEdit,
 }: Props) {
   const { isEditor } = useAuth();
+  const { status: aiStatus, progress: aiProgress, startJob } = useAiJob();
   return (
     <aside className="w-64 flex-shrink-0 space-y-6">
       <div>
@@ -30,12 +28,12 @@ export default function Sidebar({
           {isEditor && (
             <div className="flex items-center gap-1.5">
               <button
-                onClick={onAiCategorize}
-                disabled={aiCategorizeStatus === 'running'}
+                onClick={startJob}
+                disabled={aiStatus === 'running'}
                 title="AI カテゴライズ"
                 className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold transition-colors whitespace-nowrap"
               >
-                {aiCategorizeStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
+                {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
               </button>
               <button
                 onClick={onOpenCategoryEdit}
@@ -49,8 +47,8 @@ export default function Sidebar({
         </div>
 
         {/* AI progress */}
-        {aiCategorizeStatus !== 'idle' && aiCategorizeProgress && (
-          <p className="text-xs text-amber-400 mb-2">{aiCategorizeProgress}</p>
+        {aiStatus !== 'idle' && aiProgress && (
+          <p className="text-xs text-amber-400 mb-2">{aiProgress}</p>
         )}
 
         <ul className="space-y-0.5">

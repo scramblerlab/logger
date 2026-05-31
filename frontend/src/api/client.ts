@@ -20,8 +20,10 @@ export const api = {
       request('/articles', { method: 'POST', body: form }),
     update: (slug: string, form: FormData): Promise<Article> =>
       request(`/articles/${slug}`, { method: 'PUT', body: form }),
-    aiCategorize: (): Promise<Response> =>
-      fetch(`${BASE}/articles/ai-categorize`, { method: 'POST', credentials: 'include' }),
+    aiCategorize: (): Promise<{ started: boolean }> =>
+      request('/articles/ai-categorize', { method: 'POST' }),
+    aiCategorizeStatus: (): Promise<{ status: string; progress: string; current_title: string; updated: number; total: number; failed: number }> =>
+      request('/articles/ai-categorize/status'),
     aiClassify: (title: string, body: string): Promise<{ categories: string[]; tags: string[] }> =>
       request('/articles/ai-classify', {
         method: 'POST',

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAiJob } from '../context/AiJobContext';
 import LoginModal from './LoginModal';
 
 interface Props {
@@ -12,6 +13,7 @@ export default function Header({ onSearch }: Props) {
   const [showLogin, setShowLogin] = useState(false);
   const navigate = useNavigate();
   const { isEditor, logout } = useAuth();
+  const { status: aiStatus, currentTitle: aiTitle } = useAiJob();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +44,16 @@ export default function Header({ onSearch }: Props) {
               </svg>
             </div>
           </form>
-          <nav className="ml-auto flex items-center gap-2">
+          <nav className="ml-auto flex items-center gap-3">
+            {aiStatus === 'running' && (
+              <span className="hidden sm:flex items-center gap-1.5 text-xs text-amber-400 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                {aiTitle ? `AI: 「${aiTitle}」` : 'AI分析中...'}
+              </span>
+            )}
+            {aiStatus === 'done' && (
+              <span className="hidden sm:inline text-xs text-emerald-400">✓ AI分類完了</span>
+            )}
             {isEditor ? (
               <>
                 <Link
