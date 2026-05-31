@@ -21,7 +21,7 @@ export const api = {
     update: (slug: string, form: FormData): Promise<Article> =>
       request(`/articles/${slug}`, { method: 'PUT', body: form }),
     aiCategorize: (): Promise<Response> =>
-      fetch(`${BASE}/articles/ai-categorize`, { method: 'POST' }),
+      fetch(`${BASE}/articles/ai-categorize`, { method: 'POST', credentials: 'include' }),
     aiClassify: (title: string, body: string): Promise<{ categories: string[]; tags: string[] }> =>
       request('/articles/ai-classify', {
         method: 'POST',
