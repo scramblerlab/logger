@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 
 from database import init_db, DATA_DIR
 from routers import articles, categories, search, importer, auth
+from routers import shopify_importer
 from routers.auth import limiter
 from services import task_manager
 
@@ -45,6 +46,7 @@ app.include_router(articles.router)
 app.include_router(categories.router)
 app.include_router(search.router)
 app.include_router(importer.router)
+app.include_router(shopify_importer.router)
 
 
 @app.get("/api/health")

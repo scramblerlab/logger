@@ -1,4 +1,4 @@
-import type { Article, ArticleCard, ArticleListResponse, Category, CategoryCreate, Tag, ImportAnalyzeResponse } from '../types';
+import type { Article, ArticleCard, ArticleListResponse, Category, CategoryCreate, Tag, ImportAnalyzeResponse, ShopifyBlogsResponse } from '../types';
 
 const BASE = '/api';
 
@@ -60,6 +60,14 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
+      }),
+  },
+  shopify: {
+    blogs: (shopUrl: string, clientId: string, clientSecret: string): Promise<ShopifyBlogsResponse> =>
+      request('/shopify/blogs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop_url: shopUrl, client_id: clientId, client_secret: clientSecret }),
       }),
   },
   auth: {

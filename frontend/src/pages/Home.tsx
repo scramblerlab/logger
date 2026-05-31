@@ -6,6 +6,8 @@ import ArticleCard from '../components/ArticleCard';
 import Sidebar from '../components/Sidebar';
 import CategoryEditModal from '../components/CategoryEditModal';
 import BulkCategoryPanel from '../components/BulkCategoryPanel';
+import ShopifyExportDialog from '../components/ShopifyExportDialog';
+import ShopifyExportPanel from '../components/ShopifyExportPanel';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
 
@@ -34,6 +36,9 @@ export default function Home() {
     localStorage.setItem('articleSort', s);
   };
   const [bulkMode, setBulkMode] = useState(false);
+  const [exportMode, setExportMode] = useState(false);
+  const [showShopifyExportDialog, setShowShopifyExportDialog] = useState(false);
+  const [shopifyCreds, setShopifyCreds] = useState<{ shopUrl: string; clientId: string; clientSecret: string; blogId: string; blogTitle: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor } = useAuth();
@@ -48,6 +53,14 @@ export default function Home() {
 
   const enterBulkMode = () => { setBulkMode(true); setSelectedIds(new Set()); };
   const exitBulkMode  = () => { setBulkMode(false); setSelectedIds(new Set()); };
+  const enterExportMode = () => setShowShopifyExportDialog(true);
+  const exitExportMode  = () => { setExportMode(false); setSelectedIds(new Set()); setShopifyCreds(null); };
+  const handleExportConnected = (creds: typeof shopifyCreds) => {
+    setShopifyCreds(creds);
+    setShowShopifyExportDialog(false);
+    setExportMode(true);
+    setSelectedIds(new Set());
+  };
   const toggleSelect  = (id: string) => setSelectedIds((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   const selectAll = () => {
     const visible = searchResults ?? articles;
@@ -137,7 +150,7 @@ export default function Home() {
   };
 
   return (
-    <div className={`max-w-7xl mx-auto px-4 py-8 ${bulkMode ? 'pb-28' : ''}`}>
+    <div className={`max-w-7xl mx-auto px-4 py-8 ${bulkMode || exportMode ? 'pb-28' : ''}`}>
       {/* Mobile: action buttons (editor only) */}
       {isEditor && (
         <div className="flex flex-wrap gap-2 mb-3 lg:hidden">
@@ -159,6 +172,12 @@ export default function Home() {
             className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
           >
             一括更新
+          </button>
+          <button
+            onClick={enterExportMode}
+            className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
+          >
+            Shopify出力
           </button>
           {aiStatus !== 'idle' && aiProgress && (
             <span className="text-xs text-amber-400 self-center">{aiProgress}</span>
@@ -199,6 +218,7 @@ export default function Home() {
             onSelectTag={handleSelectTag}
             onOpenCategoryEdit={() => setShowCategoryEdit(true)}
             onBulkCategorize={enterBulkMode}
+            onShopifyExport={enterExportMode}
           />
         </div>
 
@@ -244,7 +264,7 @@ export default function Home() {
                   key={article.id}
                   article={article}
                   categories={categories}
-                  selectable={bulkMode}
+                  selectable={bulkMode || exportMode}
                   selected={selectedIds.has(article.id)}
                   onSelect={toggleSelect}
                 />
@@ -276,6 +296,29 @@ export default function Home() {
           onClose={() => setShowCategoryEdit(false)}
           onCategoryAdded={(cat) => setCategories((prev) => [...prev, cat].sort((a, b) => a.name_en.localeCompare(b.name_en)))}
           onCategoryDeleted={(slug) => setCategories((prev) => prev.filter((c) => c.slug !== slug))}
+        />
+      )}
+
+      {showShopifyExportDialog && (
+        <ShopifyExportDialog
+          onConfirm={handleExportConnected}
+          onCancel={() => setShowShopifyExportDialog(false)}
+        />
+      )}
+
+      {exportMode && shopifyCreds && (
+        <ShopifyExportPanel
+          selectedCount={selectedIds.size}
+          totalCount={displayedArticles.length}
+          shopUrl={shopifyCreds.shopUrl}
+          blogId={shopifyCreds.blogId}
+          clientId={shopifyCreds.clientId}
+          clientSecret={shopifyCreds.clientSecret}
+          selectedSlugs={(searchResults ?? articles).filter((a) => selectedIds.has(a.id)).map((a) => a.slug)}
+          onSelectAll={selectAll}
+          onClearSelection={() => setSelectedIds(new Set())}
+          onDone={exitExportMode}
+          onCancel={exitExportMode}
         />
       )}
     </div>

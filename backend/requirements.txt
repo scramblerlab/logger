@@ -12,3 +12,4 @@ python-slugify==8.0.4
 aiofiles==24.1.0
 python-jose[cryptography]==3.3.0
 slowapi==0.1.9
+Markdown==3.7

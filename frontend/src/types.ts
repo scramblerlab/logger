@@ -54,3 +54,14 @@ export interface CategoryCreate {
   name_ja: string;
   color: string;
 }
+
+export interface ShopifyBlog {
+  id: string;
+  title: string;
+  handle: string;
+  article_count: number;
+}
+
+export interface ShopifyBlogsResponse {
+  blogs: ShopifyBlog[];
+}

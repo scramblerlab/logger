@@ -214,6 +214,7 @@ async def update_article(
     body: Optional[str] = Form(None),
     categories: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
+    published_at: Optional[str] = Form(None),
     remove_image_paths: str = Form("[]"),
     reuse_image_as_hero: Optional[str] = Form(None),
     hero_image: Optional[UploadFile] = File(None),
@@ -241,6 +242,11 @@ async def update_article(
         tag_list = json.loads(tags)
         article.tags = json.dumps(tag_list, ensure_ascii=False)
         await _upsert_tags(db, tag_list)
+    if published_at is not None:
+        try:
+            article.published_at = datetime.fromisoformat(published_at)
+        except ValueError:
+            pass
 
     # Remove requested images from disk (rel_path values match article.json additionalImages entries)
     from pathlib import Path
@@ -293,6 +299,8 @@ async def update_article(
             art_json["tags"] = json.loads(tags)
         if (hero_image and hero_image.filename) or reuse_image_as_hero:
             art_json["heroImage"] = article.hero_image
+        if published_at is not None:
+            art_json["publishedAt"] = article.published_at.isoformat() if article.published_at else None
         art_json["additionalImages"] = all_extras
         storage.write_article_json(slug, art_json)
 

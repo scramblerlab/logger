@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function BulkCategoryPanel({
-  categories, selectedCount, totalCount,
+  categories, selectedCount,
   onSelectAll, onClearSelection, onUpdate, onCancel,
 }: Props) {
   const [catState, setCatState] = useState<Record<string, CatState>>({});

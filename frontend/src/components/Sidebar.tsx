@@ -11,12 +11,13 @@ interface Props {
   onSelectTag: (tag: string) => void;
   onOpenCategoryEdit: () => void;
   onBulkCategorize: () => void;
+  onShopifyExport: () => void;
 }
 
 export default function Sidebar({
   categories, tags, activeCategory,
   onSelectCategory, onSelectTag,
-  onOpenCategoryEdit, onBulkCategorize,
+  onOpenCategoryEdit, onBulkCategorize, onShopifyExport,
 }: Props) {
   const { isEditor } = useAuth();
   const { status: aiStatus, progress: aiProgress, startJob } = useAiJob();
@@ -113,7 +114,7 @@ export default function Sidebar({
       )}
 
       {isEditor && (
-        <div className="pt-4 border-t border-rim">
+        <div className="pt-4 border-t border-rim space-y-2">
           <Link
             to="/import"
             className="flex items-center gap-2 text-sm text-slate-500 hover:text-amber-400 transition-colors"
@@ -121,8 +122,26 @@ export default function Sidebar({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
-            一括インポート
+            WordPress一括インポート
           </Link>
+          <Link
+            to="/import/shopify"
+            className="flex items-center gap-2 text-sm text-slate-500 hover:text-amber-400 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Shopifyブログ一括インポート
+          </Link>
+          <button
+            onClick={onShopifyExport}
+            className="flex items-center gap-2 text-sm text-slate-500 hover:text-amber-400 transition-colors w-full text-left"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8v-1a3 3 0 013-3h10a3 3 0 013 3v1m-4 8l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Shopifyブログにエクスポート
+          </button>
         </div>
       )}
     </aside>

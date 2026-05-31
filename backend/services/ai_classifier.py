@@ -2,26 +2,52 @@
 AI classifier using a local Ollama model.
 Configure via backend/.env: OLLAMA_BASE_URL, OLLAMA_MODEL.
 """
-import json
 import os
+import re
 
 KNOWN_CATEGORIES = [
     "bike", "onsen", "sentou", "container", "cooking",
     "lens", "sauna", "auto", "diy", "beer",
 ]
 
-_CATS_LIST = "\n".join(f"- {c}" for c in KNOWN_CATEGORIES)
+_CATS_LIST = ", ".join(KNOWN_CATEGORIES)
 
 SYSTEM_PROMPT = f"""You are a classifier for a Japanese lifestyle blog.
 
-You MUST choose categories ONLY from this exact list (use the slugs as-is):
+Choose 1-3 categories that best match the article from this list ONLY:
 {_CATS_LIST}
 
-You MUST respond with ONLY a JSON object — no markdown, no explanation, nothing else.
-Pick 1-3 categories that best match. Add exactly 3-5 lowercase tag keywords.
+Also choose 3-5 lowercase tag keywords that describe the specific content.
 
-Required format (example):
-{{"categories":["bike"],"tags":["yamaha","sr400","custom"]}}"""
+Reply in plain text using exactly this format (nothing else before or after):
+CATEGORIES: <comma-separated slugs from the list above>
+TAGS: <comma-separated lowercase keywords>
+
+Example:
+CATEGORIES: bike, diy
+TAGS: yamaha, sr400, custom, frame, welding"""
+
+
+def _parse_response(text: str) -> dict:
+    """Extract categories and tags from a plain-text labeled response."""
+    cats: list[str] = []
+    tags: list[str] = []
+
+    for line in text.splitlines():
+        line = line.strip()
+        low = line.lower()
+
+        if low.startswith("categories:"):
+            raw = line[len("categories:"):].strip()
+            cats = [c.strip().lower() for c in re.split(r"[,\s]+", raw) if c.strip()]
+        elif low.startswith("tags:"):
+            raw = line[len("tags:"):].strip()
+            tags = [t.strip().lower() for t in re.split(r"[,\s]+", raw) if t.strip()]
+
+    # Filter categories against the known list; keep tags as-is (up to 5)
+    cats = [c for c in cats if c in KNOWN_CATEGORIES]
+    tags = [t for t in tags if t][:5]
+    return {"categories": cats, "tags": tags}
 
 
 async def classify(title: str, body_excerpt: str) -> dict:
@@ -46,24 +72,4 @@ async def classify(title: str, body_excerpt: str) -> dict:
         r.raise_for_status()
         raw = r.json()["message"]["content"].strip()
 
-    # Extract the first {...} block in case the model adds surrounding text
-    import re
-    m = re.search(r'\{.*\}', raw, re.DOTALL)
-    if not m:
-        return {"categories": [], "tags": []}
-    try:
-        result = json.loads(m.group())
-    except json.JSONDecodeError:
-        return {"categories": [], "tags": []}
-
-    cats_raw = result.get("categories", [])
-    if isinstance(cats_raw, str):
-        cats_raw = [cats_raw]
-    cats = [c for c in cats_raw if c in KNOWN_CATEGORIES]
-
-    tags_raw = result.get("tags", [])
-    if isinstance(tags_raw, str):
-        tags_raw = [tags_raw]
-    tags = [str(t).lower().strip() for t in tags_raw if t][:5]
-
-    return {"categories": cats, "tags": tags}
+    return _parse_response(raw)
