@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import ArticlePage from './pages/ArticlePage';
 import WritePage from './pages/WritePage';
 import ImportPage from './pages/ImportPage';
+import ShopifyImportPage from './pages/ShopifyImportPage';
 
 function AppInner() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ function AppInner() {
         <Route path="/articles/:slug" element={<ArticlePage />} />
         <Route path="/write" element={<WritePage />} />
         <Route path="/import" element={<ImportPage />} />
+        <Route path="/import/shopify" element={<ShopifyImportPage />} />
       </Routes>
     </div>
   );

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 interface AiJobState {
   status: 'idle' | 'running' | 'done' | 'error';
@@ -33,6 +33,9 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AiJobState>(defaultState);
   const onCompleteRef = useRef<(() => void) | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tracks last-seen server status to detect transitions; prevents re-firing onComplete
+  // on every poll after we've already handled a 'done' result and reset to idle locally.
+  const prevServerStatusRef = useRef<AiJobState['status']>('idle');
 
   const stopPolling = () => {
     if (intervalRef.current) {
@@ -46,6 +49,13 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/articles/ai-categorize/status');
       if (!res.ok) return;
       const data = await res.json();
+      const prevServerStatus = prevServerStatusRef.current;
+
+      // Ignore stale 'done' from server after we've already handled it and reset locally.
+      // Without this guard, the 8s idle poll keeps re-triggering onComplete (→ loadArticles).
+      if (data.status === 'done' && prevServerStatus === 'idle') return;
+
+      prevServerStatusRef.current = data.status;
       setState({
         status: data.status,
         progress: data.progress ?? '',
@@ -57,7 +67,10 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
       if (data.status === 'done') {
         onCompleteRef.current?.();
         // Auto-reset to idle after 5s so badge disappears
-        setTimeout(() => setState((s) => s.status === 'done' ? defaultState : s), 5000);
+        setTimeout(() => {
+          prevServerStatusRef.current = 'idle';
+          setState((s) => s.status === 'done' ? defaultState : s);
+        }, 5000);
       }
     } catch { /* ignore network errors */ }
   };
@@ -80,7 +93,7 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
       });
       if (res.status === 409) return; // already running
       if (!res.ok) throw new Error(`${res.status}`);
-      // Setting status to 'running' triggers the polling effect
+      prevServerStatusRef.current = 'running';
       setState((s) => ({ ...s, status: 'running', progress: 'AI分類を開始中...', currentTitle: '' }));
     } catch { /* ignore */ }
   };

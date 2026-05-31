@@ -30,6 +30,7 @@ export default function WritePage() {
   const [existingAdditional, setExistingAdditional] = useState<string[]>([]);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [publishedAt, setPublishedAt] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [classifyMsg, setClassifyMsg] = useState('');
@@ -45,6 +46,10 @@ export default function WritePage() {
         setBody(art.body);
         setSelectedCats(art.categories);
         setTags(art.tags);
+        if (art.published_at) {
+          // datetime-local input expects "YYYY-MM-DDTHH:MM"
+          setPublishedAt(art.published_at.slice(0, 16));
+        }
         const url = heroImageUrl(art.slug, art.hero_image, art.updated_at);
         if (url) setHeroPreview(url);
       }).catch(() => {});
@@ -119,6 +124,7 @@ export default function WritePage() {
       form.append('tags', JSON.stringify(tags));
 
       if (editSlug) {
+        if (publishedAt) form.append('published_at', publishedAt);
         form.append('remove_image_paths', JSON.stringify(removedImages));
         if (heroFile) form.append('hero_image', heroFile);
         else if (heroFromExisting) form.append('reuse_image_as_hero', heroFromExisting);
@@ -153,6 +159,19 @@ export default function WritePage() {
             <input type="text" value={titleJa} onChange={(e) => setTitleJa(e.target.value)} className={inputCls} placeholder="日本語のタイトル（任意）" />
           </div>
         </div>
+
+        {/* Published date (edit only) */}
+        {editSlug && (
+          <div className="max-w-xs">
+            <label className={labelCls}>公開日時</label>
+            <input
+              type="datetime-local"
+              value={publishedAt}
+              onChange={(e) => setPublishedAt(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        )}
 
         {/* Hero image */}
         <div>

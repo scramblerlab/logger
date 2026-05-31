@@ -124,3 +124,37 @@ class BulkCategorizeRequest(BaseModel):
     article_slugs: list[str]
     add_categories: list[str] = []
     remove_categories: list[str] = []
+
+
+class ShopifyBlogsRequest(BaseModel):
+    shop_url: str
+    client_id: str
+    client_secret: str
+
+
+class ShopifyBlog(BaseModel):
+    id: str
+    title: str
+    handle: str
+    article_count: int
+
+
+class ShopifyBlogsResponse(BaseModel):
+    blogs: list[ShopifyBlog]
+
+
+class ShopifyImportRequest(BaseModel):
+    shop_url: str
+    client_id: str
+    client_secret: str
+    blog_id: str
+    limit: Optional[int] = None
+    auto_classify: bool = True
+
+
+class ShopifyExportRequest(BaseModel):
+    shop_url: str
+    client_id: str
+    client_secret: str
+    blog_id: str
+    article_slugs: list[str]

@@ -1,6 +1,6 @@
 # logger
 
-A self-hosted, AI-powered lifestyle blog app. Consolidates content from six WordPress sub-sites at scrambler-lab.com into a single searchable interface, with local AI auto-classification, bulk import, and worldwide access via CloudFlare tunnel.
+A self-hosted, AI-powered lifestyle blog app. Consolidates content from six WordPress sub-sites at scrambler-lab.com into a single searchable interface, with local AI auto-classification, bulk import/export, and worldwide access via CloudFlare tunnel.
 
 ---
 
@@ -10,12 +10,15 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 |---|---|
 | **Post articles** | Web UI with Markdown editor, hero image drag-and-drop, bilingual title (EN/JA) |
 | **AI tagging** | Per-article "✦ AI分析" button — local Ollama model auto-assigns categories and tags |
-| **Bulk AI classify** | "AI分類" button classifies all uncategorized articles in one pass |
+| **Bulk AI classify** | "AI分類" button classifies all uncategorized articles in one background pass |
 | **Category management** | Add / delete categories from the sidebar; article counts shown inline |
-| **Browse** | Card grid with hero image, category badge, tags; dark-themed sidebar + tag cloud |
+| **Bulk category update** | Select multiple articles and add/remove categories in one operation |
+| **Browse & filter** | Card grid with hero image, category badge, tags; sort by publish date or import date |
 | **Search** | SQLite FTS5 full-text search across titles and body content |
-| **Bulk import** | One-click import from any WordPress site — REST API with sitemap/HTML fallback |
-| **Image editing** | Edit page lets you replace the hero image and add/remove additional images |
+| **WordPress import** | One-click bulk import from any WordPress site — REST API with sitemap/HTML fallback |
+| **Shopify import** | Bulk import blog articles (text + images) from a Shopify store via GraphQL Admin API |
+| **Shopify export** | Select articles and export them to a Shopify blog (text, images, categories as tags) |
+| **Auth** | Editor login (httpOnly cookie) — write/import/export require authentication |
 | **Public access** | CloudFlare tunnel exposes localhost to the internet without port-forwarding |
 
 **Categories (seeds):** bike / onsen / sentou / container / cooking / lens / sauna / auto / diy / beer
@@ -28,7 +31,7 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy async, SQLite |
 | AI | Ollama (local) — `gemma4:e2b-mlx` (Apple Silicon MLX, ~7 GB) |
-| Scraping | `httpx` + `BeautifulSoup4` + WordPress REST API |
+| Scraping | `httpx` + `BeautifulSoup4` + WordPress REST API / Shopify GraphQL |
 | Frontend | React 18, Vite, TypeScript, Tailwind CSS, dark theme |
 | Tunnel | `cloudflared` (Homebrew), Mac launchd autostart |
 
@@ -40,17 +43,22 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 logger/
 ├── backend/
 │   ├── main.py              # FastAPI app entry point
+│   ├── auth.py              # JWT cookie auth + get_current_user dependency
 │   ├── database.py          # SQLite engine, DB init, category seeds
 │   ├── models.py            # SQLAlchemy ORM: Article, Category, Tag
 │   ├── schemas.py           # Pydantic request/response schemas
 │   ├── routers/
 │   │   ├── articles.py      # CRUD + image upload + AI classify endpoints
+│   │   ├── auth.py          # Login / logout / verify
 │   │   ├── categories.py    # Category list + CRUD + tag counts
 │   │   ├── search.py        # FTS5 full-text search
-│   │   └── importer.py      # Bulk import (SSE streaming)
+│   │   ├── importer.py      # WordPress bulk import (SSE streaming)
+│   │   └── shopify_importer.py  # Shopify import + export (SSE streaming)
 │   ├── services/
 │   │   ├── ai_classifier.py # Ollama API: auto-categorise + tag
+│   │   ├── task_manager.py  # Background AI classification task runner
 │   │   ├── wp_importer.py   # WordPress importer (REST API / sitemap / scrape)
+│   │   ├── shopify_service.py  # Shopify GraphQL: list blogs, import, export
 │   │   └── storage.py       # Image save/optimise, article.json read/write
 │   ├── data/                # ⚠ NOT in git — see "Article Data" section below
 │   │   ├── blog.db          # SQLite database
@@ -59,30 +67,40 @@ logger/
 │   │           ├── article.json
 │   │           ├── hero.jpg
 │   │           └── images/
+│   ├── editors.json         # ⚠ NOT in git — editor credentials (email + bcrypt hash)
 │   ├── .env                 # ⚠ NOT in git — copy from .env.example
 │   ├── .env.example         # Template for .env
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Home.tsx         # Landing page: card grid + sidebar + filters
-│   │   │   ├── ArticlePage.tsx  # Full article with Markdown rendering
-│   │   │   ├── WritePage.tsx    # New/edit article form + AI analysis button
-│   │   │   └── ImportPage.tsx   # Bulk import UI
+│   │   │   ├── Home.tsx              # Landing page: card grid + sidebar + filters
+│   │   │   ├── ArticlePage.tsx       # Full article with Markdown rendering
+│   │   │   ├── WritePage.tsx         # New/edit article form + AI analysis button
+│   │   │   ├── ImportPage.tsx        # WordPress bulk import UI
+│   │   │   └── ShopifyImportPage.tsx # Shopify bulk import UI (3-step flow)
 │   │   ├── components/
-│   │   │   ├── Header.tsx           # Sticky header with search + Write button
-│   │   │   ├── ArticleCard.tsx      # Card: hero image, category badge, tags
-│   │   │   ├── Sidebar.tsx          # Category nav + AI classify + tag cloud
-│   │   │   └── CategoryEditModal.tsx # Add/delete categories
-│   │   ├── api/client.ts        # Fetch wrapper against FastAPI
-│   │   └── types.ts             # Shared TypeScript types
-│   ├── vite.config.ts           # Proxy /api and /static → localhost:8000
+│   │   │   ├── Header.tsx            # Sticky header with search + Write button
+│   │   │   ├── ArticleCard.tsx       # Card: hero image, category badge, tags; selectable
+│   │   │   ├── Sidebar.tsx           # Category nav + AI classify + tag cloud + import links
+│   │   │   ├── BulkCategoryPanel.tsx # Fixed bottom bar for bulk category updates
+│   │   │   ├── CategoryBadge.tsx     # Colored category chip
+│   │   │   ├── CategoryEditModal.tsx # Add/delete categories
+│   │   │   ├── LoginModal.tsx        # Editor login dialog
+│   │   │   ├── ShopifyExportDialog.tsx  # Shopify credentials + blog select modal
+│   │   │   └── ShopifyExportPanel.tsx   # Fixed bottom bar for Shopify export
+│   │   ├── context/
+│   │   │   ├── AuthContext.tsx       # Editor auth state + login/logout
+│   │   │   └── AiJobContext.tsx      # Background AI job polling + status
+│   │   ├── api/client.ts             # Fetch wrapper against FastAPI
+│   │   └── types.ts                  # Shared TypeScript types
+│   ├── vite.config.ts                # Proxy /api and /static → localhost:8000
 │   └── package.json
 ├── cloudflare/
 │   ├── config.yml           # cloudflared tunnel config (fill in TUNNEL_ID)
 │   └── setup.md             # Step-by-step CloudFlare tunnel setup guide
 ├── docs/
-│   └── plan.md              # Architecture and design decisions
+│   └── shopify-import-export.md  # Shopify feature design notes
 ├── setup.sh                 # First-time setup (deps + Ollama + model pull)
 ├── start.sh                 # Start Ollama + both servers with one command
 └── .gitignore
@@ -201,7 +219,23 @@ cd logger
 3. Runs `npm install` for the frontend
 4. Installs Ollama (via Homebrew), starts `ollama serve`, and pulls the configured model
 
-### 2 — Start
+### 2 — Configure editor credentials
+
+Create `backend/editors.json` (not in git):
+
+```json
+[
+  { "email": "you@example.com", "password_hash": "<bcrypt hash>" }
+]
+```
+
+Generate a bcrypt hash:
+
+```bash
+cd backend && .venv/bin/python -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()).decode())"
+```
+
+### 3 — Start
 
 ```bash
 ./start.sh
@@ -219,25 +253,43 @@ cd logger
 
 ---
 
+## Configuration (`backend/.env`)
+
+```
+# Ollama (local AI)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gemma4:e2b-mlx
+
+# Auth
+JWT_SECRET=<random string>
+JWT_EXPIRE_DAYS=30
+
+# Data storage
+DATA_DIR=./data
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# Shopify export — absolute base URL for body images sent to Shopify
+# Leave as localhost during development; images will be omitted from export.
+# Set to your public CloudFlare tunnel URL for full image export.
+PUBLIC_BASE_URL=http://localhost:8000
+```
+
+---
+
 ## AI Classification
 
 The app uses a **local Ollama model** for all AI features — no cloud API, no usage fees.
 
-### Configuration (`backend/.env`)
-
-```
-OLLAMA_BASE_URL=http://localhost:11434   # default
-OLLAMA_MODEL=gemma4:e2b-mlx             # Apple Silicon MLX variant (~7.1 GB)
-```
-
-Other available models (set `OLLAMA_MODEL` and run `ollama pull <model>`):
+### Available models
 
 | Model | Size | Notes |
 |---|---|---|
 | `gemma4:e2b-mlx` | 7.1 GB | **Recommended** — Apple Silicon optimised |
 | `gemma4:e2b` | 7.2 GB | Standard (non-MLX) |
-| `gemma4:e4b` | 9.6 GB | Larger, slower, slightly better quality |
-| `gemma4:e4b-mlx` | 9.6 GB | MLX variant of e4b |
+| `gemma4:e4b-mlx` | 9.6 GB | MLX variant, slightly better quality |
+| `gemma4:e4b` | 9.6 GB | Larger, slower |
+
+Set `OLLAMA_MODEL` in `.env` and run `ollama pull <model>` to switch.
 
 ### How it's used
 
@@ -245,20 +297,21 @@ Other available models (set `OLLAMA_MODEL` and run `ollama pull <model>`):
 Click **✦ AI分析** to analyse the current title + body and fill in suggested categories and tags. Review and adjust before saving.
 
 **Bulk classify (Sidebar / LP):**
-Click **AI分類** to run classification on every article that has no category assigned yet. Progress streams live. Categories and tags (3–5 keywords) are written to the DB and `article.json`.
+Click **AI分類** to run classification on every article that has no category assigned yet. Progress streams live in the sidebar badge. Categories and tags are written to the DB and `article.json`.
+
+**Post-import (automatic):**
+Both WordPress and Shopify importers automatically trigger a background AI classification pass after import completes.
 
 ---
 
-## Bulk Import
+## WordPress Import
 
 1. Open http://localhost:5173/import
 2. Click a preset button (Bike, Onsen, etc.) or paste any WordPress URL
 3. Click **分析** to preview article count and sample titles
 4. Click **インポート開始** — progress streams live via SSE
 
-### How the importer works
-
-`scrambler-lab.com` is a **WordPress Multisite network** with subdirectory installs. Each section is an independent WordPress installation:
+The importer auto-detects the WP installation root, fetches posts with `_embed=wp:featuredmedia` to inline hero images, and downloads all body images. Falls back to sitemap parsing then HTML scraping if the REST API is unavailable.
 
 | URL | WordPress REST API root | Articles |
 |---|---|---|
@@ -269,7 +322,48 @@ Click **AI分類** to run classification on every article that has no category a
 | `/cooking/` | `/cooking/wp-json/wp/v2/` | 43 |
 | `/lens/` | `/lens/wp-json/wp/v2/` | 18 |
 
-The importer auto-detects the WP installation root (`_detect_wp_base`), fetches posts with `_embed=wp:featuredmedia` to inline hero images, and downloads all body images. Falls back to sitemap parsing then HTML scraping if the REST API is unavailable.
+---
+
+## Shopify Import / Export
+
+Uses the **Shopify Admin GraphQL API** (`2024-01`) with the **Client Credentials Grant** flow (new dev.shopify.com authentication — the old static Admin API token is deprecated).
+
+### Getting credentials
+
+1. Go to [dev.shopify.com](https://dev.shopify.com) and open (or create) your app
+2. Under **設定 → APIの設定**, add scopes: `read_content` (import) and `write_content` (export)
+3. Copy **クライアントID** and **シークレット** from the 資格情報 section
+
+The store URL + client ID are saved in the browser between sessions. The client secret must be entered each time (not stored for security).
+
+### Import
+
+1. Open http://localhost:5173/import/shopify
+2. Enter store URL, client ID, and client secret → **接続してブログを確認**
+3. Select a blog from the list → set an optional article limit → **インポート開始**
+4. Progress streams live; articles are saved with hero and body images downloaded locally
+5. Background AI classification runs automatically on completion
+
+### Export
+
+1. Click **Shopifyブログにエクスポート** in the sidebar
+2. Enter credentials and select the target blog → **エクスポートモードを開始**
+3. Article cards become selectable — check the ones to export
+4. Click **Shopifyにエクスポート** in the bottom bar — progress streams live
+
+**Notes on export:**
+- Article body (Markdown) is converted to HTML before sending
+- Categories are written as Shopify tags with a `cat:` prefix (e.g., `cat:bike`)
+- Body and hero images are only included when `PUBLIC_BASE_URL` is set to a publicly reachable URL. On localhost, images are omitted (Shopify cannot reach them). Set `PUBLIC_BASE_URL` to your CloudFlare tunnel URL for full image export.
+
+---
+
+## Bulk Category Update
+
+1. Click **一括更新** in the sidebar (desktop) or action bar (mobile)
+2. Article cards become selectable with checkboxes
+3. Use the bottom panel to add or remove categories across all selected articles at once
+4. Click **更新** to apply; the panel closes and article counts refresh
 
 ---
 
@@ -298,28 +392,63 @@ cloudflared tunnel route dns logger log.scrambler-lab.com
 sudo cloudflared service install   # autostart on boot
 ```
 
-Once running, the app is accessible at your chosen hostname (e.g., `https://log.scrambler-lab.com`).
+Once running, the app is accessible at your chosen hostname (e.g., `https://log.scrambler-lab.com`). Update `PUBLIC_BASE_URL` in `backend/.env` to this URL to enable full image export to Shopify.
 
 ---
 
 ## API Reference
 
+### Articles
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/articles` | — | List articles (`?category=bike&tag=bmw&page=1&limit=20&sort=published`) |
+| `GET` | `/api/articles/{slug}` | — | Full article |
+| `POST` | `/api/articles` | ✓ | Create article (multipart form + images) |
+| `PUT` | `/api/articles/{slug}` | ✓ | Update article (multipart) |
+| `DELETE` | `/api/articles/{slug}` | ✓ | Delete article + files |
+| `POST` | `/api/articles/ai-classify` | ✓ | Classify a single article (`{title, body}`) |
+| `POST` | `/api/articles/ai-categorize` | ✓ | Start bulk background classification |
+| `GET` | `/api/articles/ai-categorize/status` | — | Poll background job status |
+| `PATCH` | `/api/articles/bulk-categorize` | ✓ | Add/remove categories on multiple articles |
+
+### Categories & Tags
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/categories` | — | List categories with article counts |
+| `POST` | `/api/categories` | ✓ | Create category |
+| `DELETE` | `/api/categories/{slug}` | ✓ | Delete category |
+| `GET` | `/api/categories/tags` | — | Tag list with counts |
+
+### Search & Import
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/search?q=...` | — | FTS5 full-text search |
+| `POST` | `/api/import/analyze` | ✓ | Preview import from a WordPress URL |
+| `POST` | `/api/import/run` | ✓ | Run WordPress bulk import (SSE stream) |
+
+### Shopify
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/shopify/blogs` | — | List blogs in a Shopify store |
+| `POST` | `/api/shopify/import` | ✓ | Bulk import from Shopify blog (SSE stream) |
+| `POST` | `/api/shopify/export` | ✓ | Export selected articles to Shopify (SSE stream) |
+
+### Auth
+
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/articles` | List articles (`?category=bike&tag=bmw&page=1&limit=20`) |
-| `GET` | `/api/articles/{slug}` | Full article |
-| `POST` | `/api/articles` | Create article (multipart form + images) |
-| `PUT` | `/api/articles/{slug}` | Update article (multipart — text + optional image replacement) |
-| `DELETE` | `/api/articles/{slug}` | Delete article + files |
-| `POST` | `/api/articles/ai-classify` | Classify a single article (`{title, body}`) |
-| `POST` | `/api/articles/ai-categorize` | Bulk classify all uncategorized articles (SSE stream) |
-| `GET` | `/api/categories` | List categories with article counts |
-| `POST` | `/api/categories` | Create category |
-| `DELETE` | `/api/categories/{slug}` | Delete category (strips from articles) |
-| `GET` | `/api/categories/tags` | Tag list with counts |
-| `GET` | `/api/search?q=...` | FTS5 full-text search |
-| `POST` | `/api/import/analyze` | Preview import from a WordPress URL |
-| `POST` | `/api/import/run` | Run bulk import (SSE stream) |
-| `GET` | `/static/articles/{slug}/...` | Serve article images |
+| `POST` | `/api/auth/login` | Login (`{email, password}`) → sets httpOnly cookie |
+| `POST` | `/api/auth/logout` | Clear auth cookie |
+| `POST` | `/api/auth/verify` | Check if current cookie is valid |
+
+### Static files
+
+| Path | Description |
+|---|---|
+| `/static/articles/{slug}/...` | Serve article images |
 
 Full interactive docs at `http://localhost:8000/docs` (Swagger UI).
