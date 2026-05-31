@@ -54,35 +54,22 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
         total: data.total ?? 0,
         failed: data.failed ?? 0,
       });
-      if (data.status !== 'running') {
-        stopPolling();
-        if (data.status === 'done') {
-          onCompleteRef.current?.();
-          // Auto-reset to idle after 5s so badge disappears
-          setTimeout(() => setState((s) => s.status === 'done' ? defaultState : s), 5000);
-        }
+      if (data.status === 'done') {
+        onCompleteRef.current?.();
+        // Auto-reset to idle after 5s so badge disappears
+        setTimeout(() => setState((s) => s.status === 'done' ? defaultState : s), 5000);
       }
     } catch { /* ignore network errors */ }
   };
 
-  const startPolling = () => {
+  // Re-create the polling interval whenever status changes frequency tier.
+  // Always keep a background slow poll (8s) so auto-triggered tasks are discovered;
+  // switch to fast poll (2s) while a task is actively running.
+  useEffect(() => {
     stopPolling();
-    intervalRef.current = setInterval(pollStatus, 2000);
-  };
-
-  // On mount: check current state once (handles page refresh mid-run)
-  useEffect(() => {
-    pollStatus();
+    pollStatus(); // immediate check
+    intervalRef.current = setInterval(pollStatus, state.status === 'running' ? 2000 : 8000);
     return () => stopPolling();
-  }, []);
-
-  // Manage polling interval whenever status changes
-  useEffect(() => {
-    if (state.status === 'running') {
-      startPolling();
-    } else {
-      stopPolling();
-    }
   }, [state.status]);
 
   const startJob = async () => {
