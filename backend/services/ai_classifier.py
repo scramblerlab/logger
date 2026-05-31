@@ -51,7 +51,10 @@ async def classify(title: str, body_excerpt: str) -> dict:
     m = re.search(r'\{.*\}', raw, re.DOTALL)
     if not m:
         return {"categories": [], "tags": []}
-    result = json.loads(m.group())
+    try:
+        result = json.loads(m.group())
+    except json.JSONDecodeError:
+        return {"categories": [], "tags": []}
 
     cats_raw = result.get("categories", [])
     if isinstance(cats_raw, str):
