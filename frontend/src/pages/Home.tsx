@@ -72,6 +72,7 @@ export default function Home() {
   const handleAiCategorize = async () => {
     setAiStatus('running');
     setAiProgress('AI分類を開始中...');
+    let completed = false;
     try {
       const res = await api.articles.aiCategorize();
       if (!res.body) return;
@@ -98,18 +99,23 @@ export default function Home() {
                   : `完了: ${evt.updated}/${evt.total}件を分類しました`;
               setAiProgress(msg);
               setAiStatus('done');
+              completed = true;
               loadArticles(true);
               reloadCategories();
+            } else if (evt.type === 'article_error') {
+              setAiProgress((p) => `${p} ⚠ ${evt.title}`);
             } else if (evt.type === 'error') {
               setAiProgress(`エラー: ${evt.message}`);
               setAiStatus('idle');
+              completed = true;
             }
           } catch { /* malformed line */ }
         }
       }
     } catch {
       setAiProgress('エラーが発生しました');
-      setAiStatus('idle');
+    } finally {
+      if (!completed) setAiStatus('idle');
     }
   };
 

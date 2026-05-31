@@ -225,10 +225,8 @@ async def ai_categorize_all(_: str = Depends(get_current_user)):
                     else:
                         failed += 1
                 except Exception as e:
-                    # Surface the first API error immediately so the user isn't left guessing
-                    err_msg = str(e)
-                    yield f"data: {json.dumps({'type': 'error', 'message': err_msg})}\n\n"
-                    return
+                    failed += 1
+                    yield f"data: {json.dumps({'type': 'article_error', 'message': str(e), 'title': article.title})}\n\n"
 
             yield f"data: {json.dumps({'type': 'done', 'updated': updated, 'total': total, 'failed': failed})}\n\n"
 
