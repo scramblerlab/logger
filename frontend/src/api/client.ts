@@ -10,8 +10,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   articles: {
-    list: (params?: Record<string, string | number>): Promise<ArticleListResponse> => {
-      const q = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    list: (params?: Record<string, string | number | undefined>): Promise<ArticleListResponse> => {
+      const filtered = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined)) as Record<string, string> : {};
+      const q = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered as Record<string, string>).toString() : '';
       return request(`/articles${q}`);
     },
     get: (slug: string): Promise<Article> => request(`/articles/${slug}`),
@@ -29,6 +30,12 @@ export const api = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, body }),
+      }),
+    bulkCategorize: (slugs: string[], add: string[], remove: string[]): Promise<{ updated: number }> =>
+      request('/articles/bulk-categorize', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article_slugs: slugs, add_categories: add, remove_categories: remove }),
       }),
   },
   categories: {
@@ -68,7 +75,12 @@ export const api = {
   },
 };
 
-export function heroImageUrl(slug: string, heroImage: string | null): string | null {
+export function heroImageUrl(slug: string, heroImage: string | null, updatedAt?: string | null): string | null {
   if (!heroImage) return null;
-  return `/static/articles/${slug}/${heroImage}`;
+  const base = `/static/articles/${slug}/${heroImage}`;
+  if (updatedAt) {
+    const ts = new Date(updatedAt).getTime();
+    if (!isNaN(ts)) return `${base}?v=${ts}`;
+  }
+  return base;
 }

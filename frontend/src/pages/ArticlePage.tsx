@@ -32,7 +32,7 @@ export default function ArticlePage() {
   }
   if (!article) return null;
 
-  const imgUrl = heroImageUrl(article.slug, article.hero_image);
+  const imgUrl = heroImageUrl(article.slug, article.hero_image, article.updated_at);
   const articleCats = categories.filter((c) => article.categories.includes(c.slug));
   const date = article.published_at
     ? new Date(article.published_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })

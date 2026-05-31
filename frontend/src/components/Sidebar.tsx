@@ -10,12 +10,13 @@ interface Props {
   onSelectCategory: (slug: string | null) => void;
   onSelectTag: (tag: string) => void;
   onOpenCategoryEdit: () => void;
+  onBulkCategorize: () => void;
 }
 
 export default function Sidebar({
   categories, tags, activeCategory,
   onSelectCategory, onSelectTag,
-  onOpenCategoryEdit,
+  onOpenCategoryEdit, onBulkCategorize,
 }: Props) {
   const { isEditor } = useAuth();
   const { status: aiStatus, progress: aiProgress, startJob } = useAiJob();
@@ -41,6 +42,13 @@ export default function Sidebar({
                 className="text-xs px-2.5 py-1 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
               >
                 編集
+              </button>
+              <button
+                onClick={onBulkCategorize}
+                title="カテゴリー一括更新"
+                className="text-xs px-2.5 py-1 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
+              >
+                一括更新
               </button>
             </div>
           )}
