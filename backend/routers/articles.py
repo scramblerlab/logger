@@ -1,19 +1,18 @@
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import AsyncIterator, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
-from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from slugify import slugify
 
 from auth import get_current_user
-from database import get_db
+from database import get_db, SessionLocal
 from models import Article, Tag
 from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AIClassifyResult
-from services import storage, ai_classifier
+from services import storage, ai_classifier, task_manager
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
 
@@ -152,6 +151,10 @@ async def create_article(
     await _upsert_tags(db, tag_list)
     await db.commit()
     await db.refresh(article)
+
+    # Kick off background AI for any uncategorized articles (no-op if already running or nothing to do)
+    await task_manager.start(SessionLocal, ai_classifier)
+
     return ArticleOut.model_validate(article)
 
 
@@ -162,75 +165,19 @@ async def ai_classify_single(req: AIClassifyRequest, _: str = Depends(get_curren
     return AIClassifyResult(**result)
 
 
-@router.post("/ai-categorize")
+@router.post("/ai-categorize", status_code=202)
 async def ai_categorize_all(_: str = Depends(get_current_user)):
-    """SSE stream: run AI classification on all uncategorized articles."""
-    import os
+    """Start background AI classification of all uncategorized articles."""
+    if task_manager.is_running():
+        raise HTTPException(409, "AI categorization already running")
+    await task_manager.start(SessionLocal, ai_classifier)
+    return {"started": True}
 
-    async def _stream() -> AsyncIterator[str]:
-        import httpx as _httpx
-        base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        model = os.getenv("OLLAMA_MODEL", "gemma4:e2b-mlx")
 
-        try:
-            async with _httpx.AsyncClient(timeout=5) as c:
-                tags_resp = await c.get(f"{base}/api/tags")
-                pulled = [m["name"] for m in tags_resp.json().get("models", [])]
-                if model not in pulled:
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'モデル {model} が見つかりません。`ollama pull {model}` を実行してください。'})}\n\n"
-                    return
-        except Exception:
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Ollama に接続できません ({base})。ollama serve が起動しているか確認してください。'})}\n\n"
-            return
-
-        from database import SessionLocal
-        async with SessionLocal() as db:
-            result = await db.execute(
-                select(Article).where(Article.categories == "[]").order_by(Article.created_at)
-            )
-            articles = result.scalars().all()
-            total = len(articles)
-            updated = 0
-            failed = 0
-
-            if total == 0:
-                yield f"data: {json.dumps({'type': 'done', 'updated': 0, 'total': 0, 'failed': 0})}\n\n"
-                return
-
-            for i, article in enumerate(articles):
-                yield f"data: {json.dumps({'type': 'progress', 'done': i, 'total': total, 'current_title': article.title})}\n\n"
-
-                try:
-                    cls = await ai_classifier.classify(article.title, article.body[:800])
-                    cats = cls.get("categories", [])
-                    new_tags = cls.get("tags", [])
-
-                    if cats:
-                        article.categories = json.dumps(cats, ensure_ascii=False)
-                        if new_tags:
-                            article.tags = json.dumps(new_tags, ensure_ascii=False)
-                            await _upsert_tags(db, new_tags)
-
-                        await db.commit()
-                        await db.refresh(article)
-
-                        art_json = storage.read_article_json(article.slug)
-                        if art_json:
-                            art_json["categories"] = cats
-                            if article.tags != "[]":
-                                art_json["tags"] = json.loads(article.tags)
-                            storage.write_article_json(article.slug, art_json)
-
-                        updated += 1
-                    else:
-                        failed += 1
-                except Exception as e:
-                    failed += 1
-                    yield f"data: {json.dumps({'type': 'article_error', 'message': str(e), 'title': article.title})}\n\n"
-
-            yield f"data: {json.dumps({'type': 'done', 'updated': updated, 'total': total, 'failed': failed})}\n\n"
-
-    return StreamingResponse(_stream(), media_type="text/event-stream")
+@router.get("/ai-categorize/status")
+async def ai_categorize_status():
+    """Return current AI categorization task state (public — read-only)."""
+    return task_manager.get_state()
 
 
 @router.put("/{slug}", response_model=ArticleOut)

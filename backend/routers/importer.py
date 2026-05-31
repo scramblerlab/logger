@@ -9,10 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from slugify import slugify
 
 from auth import get_current_user
-from database import get_db
+from database import get_db, SessionLocal
 from models import Article, Tag
 from schemas import ImportAnalyzeRequest, ImportAnalyzeResponse, ImportRunRequest
-from services import wp_importer, storage
+from services import wp_importer, storage, ai_classifier, task_manager
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -79,6 +79,8 @@ async def run_import(req: ImportRunRequest, db: AsyncSession = Depends(get_db), 
 
             elif event["type"] == "done":
                 yield f"data: {json.dumps({'finished': True, 'imported': imported})}\n\n"
+                # Kick off background AI for any uncategorized articles from this import
+                await task_manager.start(SessionLocal, ai_classifier)
 
         yield "data: [DONE]\n\n"
 
