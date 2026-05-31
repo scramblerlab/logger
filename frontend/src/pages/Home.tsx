@@ -5,6 +5,7 @@ import type { ArticleCard as ArticleCardType, Category, Tag } from '../types';
 import ArticleCard from '../components/ArticleCard';
 import Sidebar from '../components/Sidebar';
 import CategoryEditModal from '../components/CategoryEditModal';
+import BulkCategoryPanel from '../components/BulkCategoryPanel';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
 
@@ -21,9 +22,19 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<ArticleCardType[] | null>(null);
   const [showCategoryEdit, setShowCategoryEdit] = useState(false);
 
-  const activeCategory = searchParams.get('category');
+  const activeCategory = searchParams.get('category') ?? localStorage.getItem('activeCategory');
   const activeTag = searchParams.get('tag');
   const searchQuery = searchParams.get('q');
+  const [sort, setSort] = useState<'published' | 'imported'>(
+    () => (localStorage.getItem('articleSort') as 'published' | 'imported') ?? 'published'
+  );
+
+  const handleSetSort = (s: 'published' | 'imported') => {
+    setSort(s);
+    localStorage.setItem('articleSort', s);
+  };
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor } = useAuth();
   const { status: aiStatus, progress: aiProgress, startJob, setOnComplete } = useAiJob();
@@ -35,11 +46,28 @@ export default function Home() {
 
   useEffect(() => { reloadCategories(); }, [reloadCategories]);
 
+  const enterBulkMode = () => { setBulkMode(true); setSelectedIds(new Set()); };
+  const exitBulkMode  = () => { setBulkMode(false); setSelectedIds(new Set()); };
+  const toggleSelect  = (id: string) => setSelectedIds((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  const selectAll = () => {
+    const visible = searchResults ?? articles;
+    setSelectedIds(new Set(visible.map((a) => a.id)));
+  };
+
+  const handleBulkUpdate = async (add: string[], remove: string[]) => {
+    const visible = searchResults ?? articles;
+    const slugs = visible.filter((a) => selectedIds.has(a.id)).map((a) => a.slug);
+    await api.articles.bulkCategorize(slugs, add, remove);
+    exitBulkMode();
+    loadArticles(true);
+    reloadCategories();
+  };
+
   const loadArticles = useCallback(async (reset = false) => {
     setLoading(true);
     const currentPage = reset ? 1 : page;
     try {
-      const params: Record<string, string | number> = { page: currentPage, limit: PAGE_SIZE };
+      const params: Record<string, string | number | undefined> = { page: currentPage, limit: PAGE_SIZE, sort };
       if (activeCategory) params.category = activeCategory;
       if (activeTag) params.tag = activeTag;
       const data = await api.articles.list(params);
@@ -47,7 +75,7 @@ export default function Home() {
       if (reset) { setArticles(data.items); setPage(2); }
       else { setArticles((prev) => [...prev, ...data.items]); setPage((p) => p + 1); }
     } finally { setLoading(false); }
-  }, [activeCategory, activeTag, page]);
+  }, [activeCategory, activeTag, page, sort]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -56,7 +84,7 @@ export default function Home() {
       setSearchResults(null);
       loadArticles(true);
     }
-  }, [activeCategory, activeTag, searchQuery]);
+  }, [activeCategory, activeTag, searchQuery, sort]);
 
   useEffect(() => {
     setOnComplete(() => {
@@ -79,9 +107,24 @@ export default function Home() {
 
   const displayedArticles = searchResults ?? articles;
 
+  useEffect(() => {
+    const saved = localStorage.getItem('activeCategory');
+    if (saved && !searchParams.get('category')) {
+      const next = new URLSearchParams(searchParams);
+      next.set('category', saved);
+      setSearchParams(next, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSelectCategory = (slug: string | null) => {
     const next = new URLSearchParams(searchParams);
-    if (slug) next.set('category', slug); else next.delete('category');
+    if (slug) {
+      next.set('category', slug);
+      localStorage.setItem('activeCategory', slug);
+    } else {
+      next.delete('category');
+      localStorage.removeItem('activeCategory');
+    }
     next.delete('tag'); next.delete('q');
     setSearchParams(next);
   };
@@ -94,7 +137,7 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className={`max-w-7xl mx-auto px-4 py-8 ${bulkMode ? 'pb-28' : ''}`}>
       {/* Mobile: action buttons (editor only) */}
       {isEditor && (
         <div className="flex flex-wrap gap-2 mb-3 lg:hidden">
@@ -110,6 +153,12 @@ export default function Home() {
             className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
           >
             カテゴリー編集
+          </button>
+          <button
+            onClick={enterBulkMode}
+            className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
+          >
+            一括更新
           </button>
           {aiStatus !== 'idle' && aiProgress && (
             <span className="text-xs text-amber-400 self-center">{aiProgress}</span>
@@ -149,10 +198,27 @@ export default function Home() {
             onSelectCategory={handleSelectCategory}
             onSelectTag={handleSelectTag}
             onOpenCategoryEdit={() => setShowCategoryEdit(true)}
+            onBulkCategorize={enterBulkMode}
           />
         </div>
 
         <main className="flex-1 min-w-0">
+          {!searchQuery && (
+            <div className="flex items-center gap-1.5 mb-4">
+              <button
+                onClick={() => handleSetSort('published')}
+                className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${sort === 'published' ? 'bg-amber-500 text-black' : 'bg-surface2 text-slate-400 border border-rim hover:bg-rim'}`}
+              >
+                新着順
+              </button>
+              <button
+                onClick={() => handleSetSort('imported')}
+                className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${sort === 'imported' ? 'bg-amber-500 text-black' : 'bg-surface2 text-slate-400 border border-rim hover:bg-rim'}`}
+              >
+                インポート順
+              </button>
+            </div>
+          )}
           {searchQuery && (
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm text-slate-400">「{searchQuery}」の検索結果: {displayedArticles.length}件</p>
@@ -174,7 +240,14 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
               {displayedArticles.map((article) => (
-                <ArticleCard key={article.id} article={article} categories={categories} />
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  categories={categories}
+                  selectable={bulkMode}
+                  selected={selectedIds.has(article.id)}
+                  onSelect={toggleSelect}
+                />
               ))}
             </div>
           )}
@@ -184,6 +257,18 @@ export default function Home() {
           </div>
         </main>
       </div>
+
+      {bulkMode && (
+        <BulkCategoryPanel
+          categories={categories}
+          selectedCount={selectedIds.size}
+          totalCount={displayedArticles.length}
+          onSelectAll={selectAll}
+          onClearSelection={() => setSelectedIds(new Set())}
+          onUpdate={handleBulkUpdate}
+          onCancel={exitBulkMode}
+        />
+      )}
 
       {showCategoryEdit && (
         <CategoryEditModal

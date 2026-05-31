@@ -57,6 +57,7 @@ class ArticleCard(BaseModel):
     tags: list[str]
     published_at: Optional[datetime]
     created_at: datetime
+    updated_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -117,3 +118,9 @@ class ImportRunRequest(BaseModel):
     url: str
     limit: Optional[int] = None
     auto_classify: bool = True
+
+
+class BulkCategorizeRequest(BaseModel):
+    article_slugs: list[str]
+    add_categories: list[str] = []
+    remove_categories: list[str] = []

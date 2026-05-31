@@ -82,6 +82,20 @@ def read_article_json(slug: str) -> Optional[dict]:
     return None
 
 
+def copy_image_as_hero(slug: str, rel_path: str) -> str | None:
+    """Copy an existing article image to hero.jpg (re-optimized)."""
+    src = _article_dir(slug) / rel_path
+    if not src.exists():
+        return None
+    data = src.read_bytes()
+    dest = _article_dir(slug) / "hero.jpg"
+    try:
+        _write_and_optimize(data, dest)
+        return "hero.jpg"
+    except Exception:
+        return None
+
+
 def delete_article_files(slug: str):
     import shutil
     art_dir = _article_dir(slug)

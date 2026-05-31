@@ -25,6 +25,7 @@ export default function WritePage() {
   const [tagInput, setTagInput] = useState('');
   const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
+  const [heroFromExisting, setHeroFromExisting] = useState<string | null>(null);
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
   const [existingAdditional, setExistingAdditional] = useState<string[]>([]);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
@@ -44,7 +45,7 @@ export default function WritePage() {
         setBody(art.body);
         setSelectedCats(art.categories);
         setTags(art.tags);
-        const url = heroImageUrl(art.slug, art.hero_image);
+        const url = heroImageUrl(art.slug, art.hero_image, art.updated_at);
         if (url) setHeroPreview(url);
       }).catch(() => {});
       fetch(`/static/articles/${editSlug}/article.json`)
@@ -56,12 +57,25 @@ export default function WritePage() {
 
   const handleHeroDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    // File from OS / file system drag
     const file = e.dataTransfer.files[0];
-    if (file?.type.startsWith('image/')) { setHeroFile(file); setHeroPreview(URL.createObjectURL(file)); }
+    if (file?.type.startsWith('image/')) {
+      setHeroFile(file);
+      setHeroFromExisting(null);
+      setHeroPreview(URL.createObjectURL(file));
+      return;
+    }
+    // Drag from existing additional image thumbnails (rel path set in onDragStart)
+    const relPath = e.dataTransfer.getData('text/plain');
+    if (relPath && editSlug) {
+      setHeroFromExisting(relPath);
+      setHeroFile(null);
+      setHeroPreview(`/static/articles/${editSlug}/${relPath}`);
+    }
   };
   const handleHeroInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) { setHeroFile(file); setHeroPreview(URL.createObjectURL(file)); }
+    if (file) { setHeroFile(file); setHeroFromExisting(null); setHeroPreview(URL.createObjectURL(file)); }
   };
 
   const addTag = () => {
@@ -107,6 +121,7 @@ export default function WritePage() {
       if (editSlug) {
         form.append('remove_image_paths', JSON.stringify(removedImages));
         if (heroFile) form.append('hero_image', heroFile);
+        else if (heroFromExisting) form.append('reuse_image_as_hero', heroFromExisting);
         for (const f of additionalFiles) form.append('additional_images', f);
         await api.articles.update(editSlug, form);
         navigate(`/articles/${editSlug}`);
@@ -181,11 +196,19 @@ export default function WritePage() {
         {/* Existing additional images (edit mode) */}
         {editSlug && existingAdditional.length > 0 && (
           <div>
-            <label className={labelCls}>現在の追加画像</label>
+            <label className={labelCls}>現在の追加画像 <span className="text-xs text-slate-600 font-normal">（ヒーロー画像エリアにドラッグしてセット可）</span></label>
             <div className="flex flex-wrap gap-3">
               {existingAdditional.map((rel) => (
-                <div key={rel} className="relative group w-24 h-24">
-                  <img src={`/static/articles/${editSlug}/${rel}`} alt="" className="w-24 h-24 object-cover rounded-lg ring-1 ring-rim" />
+                <div
+                  key={rel}
+                  className="relative group w-24 h-24 cursor-grab active:cursor-grabbing"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', rel);
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                >
+                  <img src={`/static/articles/${editSlug}/${rel}`} alt="" className="w-24 h-24 object-cover rounded-lg ring-1 ring-rim select-none" />
                   <button type="button" onClick={() => removeExistingImage(rel)}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-600 text-white rounded-full text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                   >×</button>

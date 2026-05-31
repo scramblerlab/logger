@@ -11,7 +11,7 @@ from slugify import slugify
 from auth import get_current_user
 from database import get_db, SessionLocal
 from models import Article, Tag
-from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AIClassifyResult
+from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AIClassifyResult, BulkCategorizeRequest
 from services import storage, ai_classifier, task_manager
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
@@ -41,9 +41,14 @@ async def list_articles(
     tag: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, le=100),
+    sort: str = Query("published"),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(Article).order_by(Article.published_at.desc(), Article.created_at.desc())
+    if sort == "imported":
+        order = Article.created_at.desc()
+    else:
+        order = Article.published_at.desc()
+    q = select(Article).order_by(order)
 
     if category:
         q = q.where(Article.categories.like(f'%"{category}"%'))
@@ -180,6 +185,27 @@ async def ai_categorize_status():
     return task_manager.get_state()
 
 
+@router.patch("/bulk-categorize", status_code=200)
+async def bulk_categorize(
+    req: BulkCategorizeRequest,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    """Merge/remove categories across multiple articles in one operation."""
+    from models import now_utc
+    result = await db.execute(select(Article).where(Article.slug.in_(req.article_slugs)))
+    articles = result.scalars().all()
+    add = set(req.add_categories)
+    remove = set(req.remove_categories)
+    for article in articles:
+        existing = set(json.loads(article.categories))
+        new_cats = sorted((existing | add) - remove)
+        article.categories = json.dumps(new_cats, ensure_ascii=False)
+        article.updated_at = now_utc()
+    await db.commit()
+    return {"updated": len(articles)}
+
+
 @router.put("/{slug}", response_model=ArticleOut)
 async def update_article(
     slug: str,
@@ -189,6 +215,7 @@ async def update_article(
     categories: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     remove_image_paths: str = Form("[]"),
+    reuse_image_as_hero: Optional[str] = Form(None),
     hero_image: Optional[UploadFile] = File(None),
     additional_images: list[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
@@ -198,6 +225,9 @@ async def update_article(
     article = result.scalar_one_or_none()
     if not article:
         raise HTTPException(404, "Article not found")
+
+    from models import now_utc
+    article.updated_at = now_utc()  # always bump so hero URL cache buster changes
 
     if title is not None:
         article.title = title
@@ -222,11 +252,15 @@ async def update_article(
             if target.exists():
                 target.unlink()
 
-    # Replace hero image
+    # Replace hero image (uploaded file takes precedence over reuse path)
     if hero_image and hero_image.filename:
         data = await hero_image.read()
         hero_rel = await storage.save_upload(slug, data, hero_image.filename, is_hero=True)
         article.hero_image = hero_rel
+    elif reuse_image_as_hero:
+        hero_rel = storage.copy_image_as_hero(slug, reuse_image_as_hero)
+        if hero_rel:
+            article.hero_image = hero_rel
 
     # Add new additional images (appended to existing)
     existing_extras = []
@@ -257,7 +291,7 @@ async def update_article(
             art_json["categories"] = json.loads(categories)
         if tags is not None:
             art_json["tags"] = json.loads(tags)
-        if hero_image and hero_image.filename:
+        if (hero_image and hero_image.filename) or reuse_image_as_hero:
             art_json["heroImage"] = article.hero_image
         art_json["additionalImages"] = all_extras
         storage.write_article_json(slug, art_json)

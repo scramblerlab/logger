@@ -52,7 +52,7 @@ export default function ImportPage() {
     fetch('/api/import/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: url.trim(), auto_classify: true }),
+      body: JSON.stringify({ url: url.trim(), auto_classify: false }),
     }).then((res) => {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
@@ -151,7 +151,8 @@ export default function ImportPage() {
       {done && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 mb-6 text-sm text-green-400 font-medium">
           ✓ インポート完了！ {progress?.imported ?? log.filter(l => l.startsWith('✓')).length} 件を保存しました。
-          <Link to="/" className="ml-3 text-amber-400 hover:underline">一覧を見る →</Link>
+          <span className="block mt-1 text-xs text-green-300 font-normal">AI分類はバックグラウンドで自動的に開始されます。</span>
+          <Link to="/" className="mt-2 inline-block text-amber-400 hover:underline">一覧を見る →</Link>
         </div>
       )}
 
