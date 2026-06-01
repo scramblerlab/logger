@@ -70,6 +70,14 @@ export const api = {
         body: JSON.stringify({ shop_url: shopUrl, client_id: clientId, client_secret: clientSecret }),
       }),
   },
+  ai: {
+    ask: (question: string): Promise<{ answer: string; articles: { title: string; slug: string }[] }> =>
+      request('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      }),
+  },
   auth: {
     login: (email: string, password: string) =>
       fetch(`${BASE}/auth/login`, {

@@ -49,20 +49,14 @@ export default function ArticlePage() {
         <div className="fixed top-[72px] right-4 z-30 flex gap-2">
           <Link
             to={`/write?edit=${article.slug}`}
-            className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black text-sm font-semibold px-4 py-2 rounded-full shadow-lg transition-colors"
+            className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold shadow-lg transition-colors whitespace-nowrap"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
             編集
           </Link>
           <button
             onClick={handleDelete}
-            className="inline-flex items-center gap-1.5 bg-surface2 hover:bg-red-600 border border-rim hover:border-red-600 text-slate-300 hover:text-white text-sm font-semibold px-4 py-2 rounded-full shadow-lg transition-colors"
+            className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-red-600 border border-rim hover:border-red-600 text-slate-300 hover:text-white font-semibold shadow-lg transition-colors whitespace-nowrap"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
             削除
           </button>
         </div>

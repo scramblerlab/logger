@@ -168,7 +168,7 @@ export default function ShopifyImportPage() {
           <button
             onClick={handleConnect}
             disabled={connecting || !shopUrl.trim() || !clientId.trim() || !clientSecret.trim()}
-            className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-2.5 rounded-full transition-colors text-sm"
+            className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold text-sm py-2 rounded-full transition-colors"
           >
             {connecting ? '接続中...' : '接続してブログを確認'}
           </button>
@@ -223,7 +223,7 @@ export default function ShopifyImportPage() {
           <button
             onClick={handleImport}
             disabled={!selectedBlogId || running}
-            className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-2.5 rounded-full transition-colors text-sm"
+            className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold text-sm py-2 rounded-full transition-colors"
           >
             インポート開始 ({selectedBlog?.article_count ?? 0}件)
           </button>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
 import LoginModal from './LoginModal';
+import AskAiDialog from './AskAiDialog';
 
 interface Props {
   onSearch: (q: string) => void;
@@ -11,6 +12,7 @@ interface Props {
 export default function Header({ onSearch }: Props) {
   const [query, setQuery] = useState('');
   const [showLogin, setShowLogin] = useState(false);
+  const [showAskAi, setShowAskAi] = useState(false);
   const navigate = useNavigate();
   const { isEditor, logout } = useAuth();
   const { status: aiStatus, currentTitle: aiTitle } = useAiJob();
@@ -44,7 +46,13 @@ export default function Header({ onSearch }: Props) {
               </svg>
             </div>
           </form>
-          <nav className="ml-auto flex items-center gap-3">
+          <nav className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowAskAi(true)}
+              className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
+            >
+              ✦ AIに訊く
+            </button>
             {aiStatus === 'running' && (
               <span className="hidden sm:flex items-center gap-1.5 text-xs text-amber-400 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
@@ -58,16 +66,13 @@ export default function Header({ onSearch }: Props) {
               <>
                 <Link
                   to="/write"
-                  className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-black text-sm font-semibold px-4 py-2 rounded-full transition-colors"
+                  className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  投稿 / Write
+                  + 投稿 / Write
                 </Link>
                 <button
                   onClick={() => logout()}
-                  className="text-sm text-slate-500 hover:text-slate-300 px-3 py-2 transition-colors"
+                  className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors whitespace-nowrap"
                 >
                   ログアウト
                 </button>
@@ -75,7 +80,7 @@ export default function Header({ onSearch }: Props) {
             ) : (
               <button
                 onClick={() => setShowLogin(true)}
-                className="inline-flex items-center gap-1.5 bg-surface2 hover:bg-rim border border-rim text-slate-300 text-sm font-semibold px-4 py-2 rounded-full transition-colors"
+                className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors whitespace-nowrap"
               >
                 ログイン
               </button>
@@ -84,6 +89,7 @@ export default function Header({ onSearch }: Props) {
         </div>
       </header>
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      {showAskAi && <AskAiDialog onClose={() => setShowAskAi(false)} />}
     </>
   );
 }
