@@ -51,7 +51,7 @@ fi
 
 # Determine model from .env, fall back to default
 OLLAMA_MODEL=$(grep -E '^OLLAMA_MODEL=' "$PROJECT_DIR/backend/.env" 2>/dev/null | cut -d= -f2)
-OLLAMA_MODEL="${OLLAMA_MODEL:-gemma4:e2b-mlx}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3.5:4b}"
 
 # Check if model is already pulled
 if ollama list 2>/dev/null | grep -q "^${OLLAMA_MODEL}"; then
