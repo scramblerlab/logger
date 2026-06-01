@@ -14,7 +14,7 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 | **Category management** | Add / delete categories from the sidebar; article counts shown inline |
 | **Bulk category update** | Select multiple articles and add/remove categories in one operation |
 | **Browse & filter** | Card grid with hero image, category badge, tags; sort by publish date or import date |
-| **Search** | SQLite FTS5 full-text search across titles and body content |
+| **Search** | SQLite FTS5 full-text search with Japanese morphological tokenization (fugashi + UniDic) |
 | **WordPress import** | One-click bulk import from any WordPress site — REST API with sitemap/HTML fallback |
 | **Shopify import** | Bulk import blog articles (text + images) from a Shopify store via GraphQL Admin API |
 | **Shopify export** | Select articles and export them to a Shopify blog (text, images, categories as tags) |
@@ -56,7 +56,9 @@ logger/
 │   │   └── shopify_importer.py  # Shopify import + export (SSE streaming)
 │   ├── services/
 │   │   ├── ai_classifier.py # Ollama API: auto-categorise + tag
+│   │   ├── ai_chat.py       # Ollama API: Ask AI feature with DB + web search
 │   │   ├── task_manager.py  # Background AI classification task runner
+│   │   ├── tokenizer.py     # Japanese FTS tokenizer (fugashi + UniDic)
 │   │   ├── wp_importer.py   # WordPress importer (REST API / sitemap / scrape)
 │   │   ├── shopify_service.py  # Shopify GraphQL: list blogs, import, export
 │   │   └── storage.py       # Image save/optimise, article.json read/write
@@ -200,10 +202,12 @@ Re-run bulk import from the Import page. All 6 WordPress sections remain accessi
 
 ### Prerequisites
 
-- macOS (tested on Apple Silicon)
+- macOS (MacBook / Mac Mini — Intel or Apple Silicon)
 - Python 3.12 via [`uv`](https://github.com/astral-sh/uv) (`brew install uv`)
 - Node.js 18+ and npm
 - [Homebrew](https://brew.sh/)
+
+> **Note on Japanese search dependencies:** `fugashi` and `unidic-lite` (Japanese morphological tokenizer) are installed automatically by `setup.sh` via `pip`. Pre-built Cython wheels are available for macOS (Intel + Apple Silicon) — no Homebrew or C compiler needed.
 
 ### 1 — Clone and run setup
 

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from schemas import ArticleCard
+from services.tokenizer import tokenize_ja
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -23,7 +24,7 @@ async def search_articles(
             ORDER BY rank
             LIMIT :limit
         """),
-        {"q": q, "limit": limit},
+        {"q": tokenize_ja(q), "limit": limit},
     )
     rows = result.mappings().all()
     return [_row_to_card(dict(r)) for r in rows]

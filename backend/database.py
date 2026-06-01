@@ -43,32 +43,22 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(_Base.metadata.create_all)
 
-        # FTS5 virtual table for full-text search
-        await conn.execute(text("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts
-            USING fts5(title, body, content=articles, content_rowid=rowid)
-        """))
-
-        # Triggers to keep FTS index in sync with articles table
-        await conn.execute(text("""
-            CREATE TRIGGER IF NOT EXISTS articles_ai AFTER INSERT ON articles BEGIN
-                INSERT INTO articles_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
-            END
-        """))
-        await conn.execute(text("""
-            CREATE TRIGGER IF NOT EXISTS articles_ad AFTER DELETE ON articles BEGIN
-                INSERT INTO articles_fts(articles_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.body);
-            END
-        """))
-        await conn.execute(text("""
-            CREATE TRIGGER IF NOT EXISTS articles_au AFTER UPDATE ON articles BEGIN
-                INSERT INTO articles_fts(articles_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.body);
-                INSERT INTO articles_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
-            END
-        """))
-
-        # Rebuild index to catch all existing rows (safe to run on every startup)
-        await conn.execute(text("INSERT INTO articles_fts(articles_fts) VALUES ('rebuild')"))
+        # Migrate FTS5 to Janome/fugashi-tokenized standalone table (runs once via user_version)
+        # user_version 0 = old unicode61 content table; 1 = fugashi tokenized standalone table
+        version = (await conn.execute(text("PRAGMA user_version"))).scalar()
+        if version < 1:
+            await conn.execute(text("DROP TABLE IF EXISTS articles_fts"))
+            await conn.execute(text("CREATE VIRTUAL TABLE articles_fts USING fts5(title, body)"))
+            for trig in ("articles_ai", "articles_ad", "articles_au"):
+                await conn.execute(text(f"DROP TRIGGER IF EXISTS {trig}"))
+            from services.tokenizer import tokenize_ja
+            rows = (await conn.execute(text("SELECT rowid, title, body FROM articles"))).fetchall()
+            for row in rows:
+                await conn.execute(
+                    text("INSERT INTO articles_fts(rowid, title, body) VALUES (:rowid, :title, :body)"),
+                    {"rowid": row[0], "title": tokenize_ja(row[1] or ""), "body": tokenize_ja(row[2] or "")},
+                )
+            await conn.execute(text("PRAGMA user_version = 1"))
 
     # Seed categories
     async with SessionLocal() as session:

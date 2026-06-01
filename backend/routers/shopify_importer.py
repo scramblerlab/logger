@@ -78,6 +78,9 @@ async def run_import(
                                 db.add(Tag(slug=tag_slug, name=tag_name, article_count=1))
 
                         await db.commit()
+                        from routers.articles import _fts_upsert
+                        await _fts_upsert(db, article)
+                        await db.commit()
 
                         storage.write_article_json(art["slug"], {
                             **art,
