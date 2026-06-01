@@ -6,7 +6,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # --- Ollama ---
 OLLAMA_MODEL=$(grep -E '^OLLAMA_MODEL=' "$PROJECT_DIR/backend/.env" 2>/dev/null | cut -d= -f2)
-OLLAMA_MODEL="${OLLAMA_MODEL:-gemma4:e2b-mlx}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3.5:4b}"
 OLLAMA_BASE_URL=$(grep -E '^OLLAMA_BASE_URL=' "$PROJECT_DIR/backend/.env" 2>/dev/null | cut -d= -f2)
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
 
