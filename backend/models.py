@@ -15,7 +15,6 @@ class Article(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
-    title_ja: Mapped[str | None] = mapped_column(Text)
     body: Mapped[str] = mapped_column(Text, nullable=False, default="")
     hero_image: Mapped[str | None] = mapped_column(String)
     categories: Mapped[str] = mapped_column(Text, default="[]")   # JSON array string

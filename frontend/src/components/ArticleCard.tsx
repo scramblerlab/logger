@@ -55,9 +55,6 @@ export default function ArticleCard({ article, categories, selectable, selected,
         <h3 className="font-bold text-slate-100 line-clamp-2 leading-snug mb-1 group-hover:text-amber-400 transition-colors">
           {article.title}
         </h3>
-        {article.title_ja && article.title_ja !== article.title && (
-          <p className="text-sm text-slate-500 line-clamp-1 mb-2">{article.title_ja}</p>
-        )}
         <div className="flex flex-wrap gap-1 mt-2">
           {article.tags.slice(0, 4).map((tag) => (
             <span key={tag} className="text-xs text-slate-500 bg-surface2 px-1.5 py-0.5 rounded">#{tag}</span>

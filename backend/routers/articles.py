@@ -81,7 +81,6 @@ async def get_article(slug: str, db: AsyncSession = Depends(get_db)):
 @router.post("", response_model=ArticleOut, status_code=201)
 async def create_article(
     title: str = Form(...),
-    title_ja: Optional[str] = Form(None),
     body: str = Form(""),
     categories: str = Form("[]"),
     tags: str = Form("[]"),
@@ -128,7 +127,6 @@ async def create_article(
     article = Article(
         slug=slug,
         title=title,
-        title_ja=title_ja,
         body=body,
         hero_image=hero_rel,
         categories=json.dumps(cats, ensure_ascii=False),
@@ -144,7 +142,6 @@ async def create_article(
         "id": article.id,
         "slug": slug,
         "title": title,
-        "title_ja": title_ja,
         "body": body,
         "heroImage": hero_rel,
         "additionalImages": extra_rels,
@@ -210,7 +207,6 @@ async def bulk_categorize(
 async def update_article(
     slug: str,
     title: Optional[str] = Form(None),
-    title_ja: Optional[str] = Form(None),
     body: Optional[str] = Form(None),
     categories: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
@@ -232,8 +228,6 @@ async def update_article(
 
     if title is not None:
         article.title = title
-    if title_ja is not None:
-        article.title_ja = title_ja
     if body is not None:
         article.body = body
     if categories is not None:
@@ -289,8 +283,6 @@ async def update_article(
     if art_json:
         if title is not None:
             art_json["title"] = title
-        if title_ja is not None:
-            art_json["title_ja"] = title_ja
         if body is not None:
             art_json["body"] = body
         if categories is not None:

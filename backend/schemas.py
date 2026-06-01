@@ -27,7 +27,6 @@ class TagOut(BaseModel):
 
 class ArticleBase(BaseModel):
     title: str
-    title_ja: Optional[str] = None
     body: str = ""
     categories: list[str] = []
     tags: list[str] = []
@@ -40,7 +39,6 @@ class ArticleCreate(ArticleBase):
 
 class ArticleUpdate(BaseModel):
     title: Optional[str] = None
-    title_ja: Optional[str] = None
     body: Optional[str] = None
     categories: Optional[list[str]] = None
     tags: Optional[list[str]] = None
@@ -51,7 +49,6 @@ class ArticleCard(BaseModel):
     id: str
     slug: str
     title: str
-    title_ja: Optional[str]
     hero_image: Optional[str]
     categories: list[str]
     tags: list[str]
