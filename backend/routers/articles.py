@@ -13,6 +13,7 @@ from database import get_db, SessionLocal
 from models import Article, Tag
 from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AIClassifyResult, BulkCategorizeRequest
 from services import storage, ai_classifier, task_manager
+from services.tokenizer import tokenize_ja
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
 
@@ -29,9 +30,12 @@ async def _upsert_tags(db: AsyncSession, tag_names: list[str]):
 
 
 async def _fts_upsert(db: AsyncSession, article: Article):
+    rowid = (await db.execute(text("SELECT rowid FROM articles WHERE id = :id"), {"id": article.id})).scalar()
+    if rowid is None:
+        return
     await db.execute(
         text("INSERT OR REPLACE INTO articles_fts(rowid, title, body) VALUES (:rowid, :title, :body)"),
-        {"rowid": article.rowid if hasattr(article, "rowid") else None, "title": article.title, "body": article.body},
+        {"rowid": rowid, "title": tokenize_ja(article.title or ""), "body": tokenize_ja(article.body or "")},
     )
 
 
@@ -151,6 +155,7 @@ async def create_article(
     })
 
     await _upsert_tags(db, tag_list)
+    await _fts_upsert(db, article)
     await db.commit()
     await db.refresh(article)
 
@@ -296,6 +301,7 @@ async def update_article(
         art_json["additionalImages"] = all_extras
         storage.write_article_json(slug, art_json)
 
+    await _fts_upsert(db, article)
     await db.commit()
     await db.refresh(article)
     return ArticleOut.model_validate(article)
@@ -307,6 +313,9 @@ async def delete_article(slug: str, db: AsyncSession = Depends(get_db), _: str =
     article = result.scalar_one_or_none()
     if not article:
         raise HTTPException(404, "Article not found")
+    rowid = (await db.execute(text("SELECT rowid FROM articles WHERE id = :id"), {"id": article.id})).scalar()
+    if rowid:
+        await db.execute(text("DELETE FROM articles_fts WHERE rowid = :rowid"), {"rowid": rowid})
     await db.delete(article)
     storage.delete_article_files(slug)
     await db.commit()

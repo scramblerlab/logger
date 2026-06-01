@@ -3,6 +3,7 @@ import os
 import httpx
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from services.tokenizer import tokenize_ja
 
 SYSTEM_PROMPT = """You are a helpful assistant for a personal Japanese lifestyle blog called "logger".
 
@@ -82,13 +83,14 @@ def _format_site_stats(stats: dict) -> str:
 
 async def _search_db(question: str, db: AsyncSession, limit: int = 5) -> dict:
     try:
+        fts_q = tokenize_ja(question)
         count_row = await db.execute(
             text("""
                 SELECT COUNT(*) FROM articles a
                 JOIN articles_fts fts ON a.rowid = fts.rowid
                 WHERE articles_fts MATCH :q
             """),
-            {"q": question},
+            {"q": fts_q},
         )
         total = count_row.scalar() or 0
 
@@ -101,7 +103,7 @@ async def _search_db(question: str, db: AsyncSession, limit: int = 5) -> dict:
                 ORDER BY rank
                 LIMIT :limit
             """),
-            {"q": question, "limit": limit},
+            {"q": fts_q, "limit": limit},
         )
         rows = result.mappings().all()
         articles = [{"slug": r["slug"], "title": r["title"], "excerpt": (r["body"] or "")[:250]} for r in rows]
