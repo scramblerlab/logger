@@ -81,7 +81,7 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     stopPolling();
     pollStatus(); // immediate check
-    intervalRef.current = setInterval(pollStatus, state.status === 'running' ? 2000 : 8000);
+    intervalRef.current = setInterval(pollStatus, state.status === 'running' ? 2000 : 30000);
     return () => stopPolling();
   }, [state.status]);
 

@@ -93,7 +93,7 @@ export default function ImportPage() {
       <div className="flex flex-wrap gap-2 mb-4">
         {PRESET_URLS.map((p) => (
           <button key={p.label} onClick={() => setUrl(p.url)}
-            className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim text-slate-300 font-medium border border-rim transition-colors"
+            className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim text-slate-300 font-semibold border border-rim transition-colors whitespace-nowrap"
           >
             {p.label}
           </button>
@@ -107,7 +107,7 @@ export default function ImportPage() {
           className="flex-1 bg-surface2 border border-rim2 text-slate-100 placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
         />
         <button onClick={handleAnalyze} disabled={analyzing || !url.trim()}
-          className="px-4 py-2 bg-surface2 hover:bg-rim disabled:opacity-50 text-slate-200 text-sm font-medium rounded-lg transition-colors border border-rim"
+          className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim disabled:opacity-50 text-slate-200 font-semibold border border-rim transition-colors whitespace-nowrap"
         >
           {analyzing ? '分析中...' : '分析'}
         </button>
@@ -129,7 +129,7 @@ export default function ImportPage() {
             </div>
           )}
           <button onClick={handleImport} disabled={running}
-            className="w-full mt-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-2.5 rounded-full transition-colors text-sm"
+            className="w-full mt-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold text-sm py-2 rounded-full transition-colors"
           >
             {running ? 'インポート中...' : `インポート開始 (${analysis.article_count}件)`}
           </button>

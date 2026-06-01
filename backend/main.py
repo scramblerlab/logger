@@ -13,7 +13,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from database import init_db, DATA_DIR
-from routers import articles, categories, search, importer, auth
+from routers import articles, categories, search, importer, auth, ai_chat
 from routers import shopify_importer
 from routers.auth import limiter
 from services import task_manager
@@ -49,6 +49,7 @@ app.include_router(categories.router)
 app.include_router(search.router)
 app.include_router(importer.router)
 app.include_router(shopify_importer.router)
+app.include_router(ai_chat.router)
 
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"

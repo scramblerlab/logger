@@ -233,7 +233,7 @@ export default function WritePage() {
           <label className={labelCls}>{editSlug ? '追加画像を追加' : '追加画像'}</label>
           <input type="file" accept="image/*" multiple
             onChange={(e) => setAdditionalFiles(Array.from(e.target.files ?? []))}
-            className="text-sm text-slate-400 file:mr-3 file:text-sm file:font-semibold file:bg-amber-500 file:text-black file:border-0 file:px-3 file:py-1 file:rounded-full hover:file:bg-amber-400 file:transition-colors"
+            className="text-xs text-slate-400 file:mr-3 file:text-xs file:font-semibold file:bg-amber-500 file:text-black file:border-0 file:px-2.5 file:py-1 file:rounded-full hover:file:bg-amber-400 file:transition-colors"
           />
           {additionalFiles.length > 0 && <p className="text-xs text-slate-500 mt-1">{additionalFiles.length}件選択済み</p>}
         </div>
@@ -243,7 +243,7 @@ export default function WritePage() {
           <div className="flex items-center gap-3 mb-2">
             <label className="text-sm font-medium text-slate-400">カテゴリー</label>
             <button type="button" onClick={handleAiClassify} disabled={classifying || !title}
-              className="text-xs px-3 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40 transition-colors"
+              className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40 transition-colors whitespace-nowrap"
             >
               {classifying ? '⏳ AI分析中...' : '✦ AI分析'}
             </button>
@@ -256,7 +256,7 @@ export default function WritePage() {
           <div className="flex flex-wrap gap-2">
             {categories.map((cat) => (
               <button key={cat.slug} type="button" onClick={() => toggleCat(cat.slug)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                className={`text-xs px-2.5 py-1 rounded-full font-semibold border transition-colors whitespace-nowrap ${
                   selectedCats.includes(cat.slug)
                     ? 'text-white border-transparent'
                     : 'border-rim text-slate-400 hover:bg-surface2 hover:text-slate-100'
@@ -278,7 +278,7 @@ export default function WritePage() {
               placeholder="タグを入力 → Enter" className={inputCls}
             />
             <button type="button" onClick={addTag}
-              className="px-4 py-2 text-sm bg-surface2 hover:bg-rim text-slate-300 font-medium rounded-lg border border-rim transition-colors"
+              className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim text-slate-300 font-semibold border border-rim transition-colors whitespace-nowrap"
             >追加</button>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -294,12 +294,12 @@ export default function WritePage() {
         {/* Submit */}
         <div className="flex gap-3 pt-2">
           <button type="submit" disabled={submitting}
-            className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold py-3 rounded-full transition-colors"
+            className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold text-sm py-2 rounded-full transition-colors"
           >
             {submitting ? '投稿中...' : editSlug ? '更新する' : '投稿する'}
           </button>
           <button type="button" onClick={() => navigate(-1)}
-            className="px-6 py-3 bg-surface2 hover:bg-rim text-slate-300 font-medium rounded-xl border border-rim transition-colors"
+            className="text-xs px-4 py-2 rounded-full bg-surface2 hover:bg-rim text-slate-300 font-semibold border border-rim transition-colors whitespace-nowrap"
           >
             キャンセル
           </button>
