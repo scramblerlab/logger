@@ -49,6 +49,27 @@ async def init_db():
             USING fts5(title, body, content=articles, content_rowid=rowid)
         """))
 
+        # Triggers to keep FTS index in sync with articles table
+        await conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS articles_ai AFTER INSERT ON articles BEGIN
+                INSERT INTO articles_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+            END
+        """))
+        await conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS articles_ad AFTER DELETE ON articles BEGIN
+                INSERT INTO articles_fts(articles_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.body);
+            END
+        """))
+        await conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS articles_au AFTER UPDATE ON articles BEGIN
+                INSERT INTO articles_fts(articles_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.body);
+                INSERT INTO articles_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
+            END
+        """))
+
+        # Rebuild index to catch all existing rows (safe to run on every startup)
+        await conn.execute(text("INSERT INTO articles_fts(articles_fts) VALUES ('rebuild')"))
+
     # Seed categories
     async with SessionLocal() as session:
         from sqlalchemy import select

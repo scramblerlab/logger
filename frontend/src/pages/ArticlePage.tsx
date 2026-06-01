@@ -13,8 +13,6 @@ export default function ArticlePage() {
   const [article, setArticle] = useState<Article | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showJa, setShowJa] = useState(false);
-
   useEffect(() => {
     if (!slug) return;
     Promise.all([api.articles.get(slug), api.categories.list()])
@@ -88,19 +86,9 @@ export default function ArticlePage() {
         ))}
       </div>
 
-      <div className="flex items-start justify-between gap-4 mb-2">
-        <h1 className="text-3xl font-bold text-slate-100 leading-tight flex-1">
-          {showJa && article.title_ja ? article.title_ja : article.title}
-        </h1>
-        {article.title_ja && article.title_ja !== article.title && (
-          <button
-            onClick={() => setShowJa((v) => !v)}
-            className="flex-shrink-0 text-xs bg-surface2 hover:bg-rim border border-rim text-slate-400 px-2 py-1 rounded-lg transition-colors mt-1"
-          >
-            {showJa ? 'EN' : 'JA'}
-          </button>
-        )}
-      </div>
+      <h1 className="text-3xl font-bold text-slate-100 leading-tight mb-2">
+        {article.title}
+      </h1>
 
       {date && <p className="text-sm text-slate-500 mb-6">{date}</p>}
 

@@ -18,7 +18,6 @@ export default function WritePage() {
   }, [isLoading, isEditor, navigate]);
 
   const [title, setTitle] = useState('');
-  const [titleJa, setTitleJa] = useState('');
   const [body, setBody] = useState('');
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
@@ -42,7 +41,6 @@ export default function WritePage() {
     if (editSlug) {
       api.articles.get(editSlug).then((art) => {
         setTitle(art.title);
-        setTitleJa(art.title_ja ?? '');
         setBody(art.body);
         setSelectedCats(art.categories);
         setTags(art.tags);
@@ -118,7 +116,6 @@ export default function WritePage() {
     try {
       const form = new FormData();
       form.append('title', title);
-      form.append('title_ja', titleJa);
       form.append('body', body);
       form.append('categories', JSON.stringify(selectedCats));
       form.append('tags', JSON.stringify(tags));
@@ -149,15 +146,9 @@ export default function WritePage() {
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* Title */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>タイトル (Title) <span className="text-red-400">*</span></label>
-            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Article title" />
-          </div>
-          <div>
-            <label className={labelCls}>日本語タイトル</label>
-            <input type="text" value={titleJa} onChange={(e) => setTitleJa(e.target.value)} className={inputCls} placeholder="日本語のタイトル（任意）" />
-          </div>
+        <div>
+          <label className={labelCls}>タイトル (Title) <span className="text-red-400">*</span></label>
+          <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Article title" />
         </div>
 
         {/* Published date (edit only) */}

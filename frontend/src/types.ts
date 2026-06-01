@@ -18,7 +18,6 @@ export interface ArticleCard {
   id: string;
   slug: string;
   title: string;
-  title_ja: string | null;
   hero_image: string | null;
   categories: string[];
   tags: string[];
