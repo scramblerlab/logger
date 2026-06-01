@@ -37,12 +37,18 @@ cd "$PROJECT_DIR/frontend"
 npm run dev &
 FRONTEND_PID=$!
 
+# --- CloudFlare Tunnel ---
+echo "Starting CloudFlare tunnel..."
+cloudflared tunnel --config "$PROJECT_DIR/cloudflare/config.yml" run &>/tmp/cloudflared.log &
+CLOUDFLARED_PID=$!
+
 echo ""
 echo "  Backend:  http://localhost:8000"
 echo "  Frontend: http://localhost:5173"
 echo "  API docs: http://localhost:8000/docs"
+echo "  Public:   https://log.scrambler-lab.com"
 echo ""
 echo "Press Ctrl+C to stop."
 
-trap "kill $BACKEND_PID $FRONTEND_PID ${OLLAMA_PID:-} 2>/dev/null; exit" SIGINT SIGTERM
+trap "kill $BACKEND_PID $FRONTEND_PID $CLOUDFLARED_PID ${OLLAMA_PID:-} 2>/dev/null; exit" SIGINT SIGTERM
 wait
