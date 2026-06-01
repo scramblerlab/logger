@@ -1,11 +1,13 @@
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -49,6 +51,27 @@ app.include_router(importer.router)
 app.include_router(shopify_importer.router)
 
 
+FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/favicon.svg")
+    async def favicon():
+        return FileResponse(FRONTEND_DIST / "favicon.svg")
+
+    @app.get("/icons.svg")
+    async def icons():
+        return FileResponse(FRONTEND_DIST / "icons.svg")
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/{full_path:path}")
+async def spa_fallback(full_path: str):
+    if FRONTEND_DIST.exists():
+        return FileResponse(FRONTEND_DIST / "index.html")
+    return {"detail": "Not Found"}
