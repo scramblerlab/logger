@@ -1,9 +1,8 @@
 import asyncio
-import os
-import httpx
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from services.tokenizer import tokenize_ja
+from services import ollama_client
 
 SYSTEM_PROMPT = """You are a helpful assistant for a personal Japanese lifestyle blog called "logger".
 
@@ -113,20 +112,7 @@ async def _search_db(question: str, db: AsyncSession, limit: int = 5) -> dict:
 
 
 async def _web_search(query: str, max_results: int = 5) -> list[dict]:
-    api_key = os.getenv("OLLAMA_API_KEY", "")
-    if not api_key:
-        return []
-    async with httpx.AsyncClient(timeout=15) as client:
-        try:
-            r = await client.post(
-                "https://ollama.com/api/web_search",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={"query": query, "max_results": max_results},
-            )
-            r.raise_for_status()
-            return r.json().get("results", [])
-        except Exception:
-            return []
+    return await ollama_client.web_search(query, max_results=max_results)
 
 
 def _build_context(stats_text: str, db_result: dict, web_results: list[dict]) -> str:
@@ -164,24 +150,13 @@ async def ask_ai(question: str, db: AsyncSession) -> dict:
     context = _build_context(stats_text, db_result, web_results)
     user_message = f"{context}\n\n---\nQuestion: {question}"
 
-    base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    model = os.getenv("OLLAMA_MODEL", "gemma4:e2b-mlx")
-
-    async with httpx.AsyncClient(timeout=120) as client:
-        r = await client.post(
-            f"{base}/api/chat",
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-                "stream": False,
-                "options": {"num_ctx": 8192},
-            },
-        )
-        r.raise_for_status()
-        answer = r.json()["message"]["content"].strip()
+    answer = await ollama_client.chat(
+        [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        options={"num_ctx": 8192},
+    )
 
     return {
         "answer": answer,

@@ -37,6 +37,12 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ article_slugs: slugs, add_categories: add, remove_categories: remove }),
       }),
+    aiComment: (slug: string): Promise<{ ai_comment: string; ai_comment_model: string }> =>
+      request(`/articles/${slug}/ai-comment`, { method: 'POST' }),
+    aiCommentBulk: (): Promise<{ started: boolean }> =>
+      request('/articles/ai-comment-bulk', { method: 'POST' }),
+    aiCommentBulkStatus: (): Promise<{ status: string; progress: string; current_title: string; updated: number; total: number; failed: number }> =>
+      request('/articles/ai-comment-bulk/status'),
   },
   categories: {
     list: (): Promise<Category[]> => request('/categories'),

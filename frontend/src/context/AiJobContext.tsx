@@ -12,6 +12,9 @@ interface AiJobState {
 interface AiJobContextValue extends AiJobState {
   startJob: () => Promise<void>;
   setOnComplete: (fn: () => void) => void;
+  commentStatus: AiJobState['status'];
+  commentProgress: string;
+  startCommentJob: () => Promise<void>;
 }
 
 const defaultState: AiJobState = {
@@ -27,14 +30,16 @@ const AiJobContext = createContext<AiJobContextValue>({
   ...defaultState,
   startJob: async () => {},
   setOnComplete: () => {},
+  commentStatus: 'idle',
+  commentProgress: '',
+  startCommentJob: async () => {},
 });
 
 export function AiJobProvider({ children }: { children: ReactNode }) {
+  // --- Categorize job ---
   const [state, setState] = useState<AiJobState>(defaultState);
   const onCompleteRef = useRef<(() => void) | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Tracks last-seen server status to detect transitions; prevents re-firing onComplete
-  // on every poll after we've already handled a 'done' result and reset to idle locally.
   const prevServerStatusRef = useRef<AiJobState['status']>('idle');
 
   const stopPolling = () => {
@@ -51,8 +56,6 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       const prevServerStatus = prevServerStatusRef.current;
 
-      // Ignore stale 'done' from server after we've already handled it and reset locally.
-      // Without this guard, the 8s idle poll keeps re-triggering onComplete (→ loadArticles).
       if (data.status === 'done' && prevServerStatus === 'idle') return;
 
       prevServerStatusRef.current = data.status;
@@ -66,7 +69,6 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
       });
       if (data.status === 'done') {
         onCompleteRef.current?.();
-        // Auto-reset to idle after 5s so badge disappears
         setTimeout(() => {
           prevServerStatusRef.current = 'idle';
           setState((s) => s.status === 'done' ? defaultState : s);
@@ -75,12 +77,9 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore network errors */ }
   };
 
-  // Re-create the polling interval whenever status changes frequency tier.
-  // Always keep a background slow poll (8s) so auto-triggered tasks are discovered;
-  // switch to fast poll (2s) while a task is actively running.
   useEffect(() => {
     stopPolling();
-    pollStatus(); // immediate check
+    pollStatus();
     intervalRef.current = setInterval(pollStatus, state.status === 'running' ? 2000 : 30000);
     return () => stopPolling();
   }, [state.status]);
@@ -91,7 +90,7 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         credentials: 'include',
       });
-      if (res.status === 409) return; // already running
+      if (res.status === 409) return;
       if (!res.ok) throw new Error(`${res.status}`);
       prevServerStatusRef.current = 'running';
       setState((s) => ({ ...s, status: 'running', progress: 'AI分類を開始中...', currentTitle: '' }));
@@ -102,8 +101,77 @@ export function AiJobProvider({ children }: { children: ReactNode }) {
     onCompleteRef.current = fn;
   };
 
+  // --- AI Comment job ---
+  const [commentState, setCommentState] = useState<AiJobState>(defaultState);
+  const commentIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevCommentServerStatusRef = useRef<AiJobState['status']>('idle');
+
+  const stopCommentPolling = () => {
+    if (commentIntervalRef.current) {
+      clearInterval(commentIntervalRef.current);
+      commentIntervalRef.current = null;
+    }
+  };
+
+  const pollCommentStatus = async () => {
+    try {
+      const res = await fetch('/api/articles/ai-comment-bulk/status');
+      if (!res.ok) return;
+      const data = await res.json();
+      const prev = prevCommentServerStatusRef.current;
+
+      if (data.status === 'done' && prev === 'idle') return;
+
+      prevCommentServerStatusRef.current = data.status;
+      setCommentState({
+        status: data.status,
+        progress: data.progress ?? '',
+        currentTitle: data.current_title ?? '',
+        updated: data.updated ?? 0,
+        total: data.total ?? 0,
+        failed: data.failed ?? 0,
+      });
+      if (data.status === 'done') {
+        setTimeout(() => {
+          prevCommentServerStatusRef.current = 'idle';
+          setCommentState((s) => s.status === 'done' ? defaultState : s);
+        }, 5000);
+      }
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    stopCommentPolling();
+    pollCommentStatus();
+    commentIntervalRef.current = setInterval(
+      pollCommentStatus,
+      commentState.status === 'running' ? 2000 : 30000,
+    );
+    return () => stopCommentPolling();
+  }, [commentState.status]);
+
+  const startCommentJob = async () => {
+    try {
+      const res = await fetch('/api/articles/ai-comment-bulk', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.status === 409) return;
+      if (!res.ok) throw new Error(`${res.status}`);
+      prevCommentServerStatusRef.current = 'running';
+      setCommentState((s) => ({ ...s, status: 'running', progress: 'AIコメント生成を開始中...' }));
+    } catch { /* ignore */ }
+  };
+
   return (
-    <AiJobContext.Provider value={{ ...state, startJob, setOnComplete }}>
+    <AiJobContext.Provider value={{
+      ...state,
+      startJob,
+      setOnComplete,
+      commentStatus: commentState.status,
+      commentProgress: commentState.progress,
+      startCommentJob,
+    }}>
       {children}
     </AiJobContext.Provider>
   );

@@ -23,6 +23,8 @@ class Article(Base):
     source_url: Mapped[str | None] = mapped_column(String)
     source_site: Mapped[str | None] = mapped_column(String)
     data_path: Mapped[str | None] = mapped_column(String)
+    ai_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_comment_model: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 

@@ -30,6 +30,8 @@ export interface Article extends ArticleCard {
   body: string;
   source_url: string | null;
   updated_at: string;
+  ai_comment: string | null;
+  ai_comment_model: string | null;
 }
 
 export interface ArticleListResponse {

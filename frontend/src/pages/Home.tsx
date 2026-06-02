@@ -42,7 +42,7 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor } = useAuth();
-  const { status: aiStatus, progress: aiProgress, startJob, setOnComplete } = useAiJob();
+  const { status: aiStatus, progress: aiProgress, startJob, setOnComplete, commentStatus, commentProgress, startCommentJob } = useAiJob();
 
   const reloadCategories = useCallback(() => {
     api.categories.list().then(setCategories).catch(() => {});
@@ -162,6 +162,13 @@ export default function Home() {
             {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
           </button>
           <button
+            onClick={startCommentJob}
+            disabled={commentStatus === 'running'}
+            className="text-xs px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-50 transition-colors"
+          >
+            {commentStatus === 'running' ? '⏳ AIコメント中...' : 'AIコメント追加'}
+          </button>
+          <button
             onClick={() => setShowCategoryEdit(true)}
             className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
           >
@@ -181,6 +188,9 @@ export default function Home() {
           </button>
           {aiStatus !== 'idle' && aiProgress && (
             <span className="text-xs text-amber-400 self-center">{aiProgress}</span>
+          )}
+          {commentStatus !== 'idle' && commentProgress && (
+            <span className="text-xs text-amber-400 self-center">{commentProgress}</span>
           )}
         </div>
       )}

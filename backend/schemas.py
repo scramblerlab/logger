@@ -43,6 +43,8 @@ class ArticleUpdate(BaseModel):
     categories: Optional[list[str]] = None
     tags: Optional[list[str]] = None
     published_at: Optional[datetime] = None
+    ai_comment: Optional[str] = None
+    ai_comment_model: Optional[str] = None
 
 
 class ArticleCard(BaseModel):
@@ -73,6 +75,8 @@ class ArticleOut(ArticleCard):
     body: str
     source_url: Optional[str]
     updated_at: datetime
+    ai_comment: Optional[str] = None
+    ai_comment_model: Optional[str] = None
 
 
 class ArticleListResponse(BaseModel):
@@ -97,6 +101,11 @@ class AIClassifyRequest(BaseModel):
 class AIClassifyResult(BaseModel):
     categories: list[str]
     tags: list[str]
+
+
+class AICommentResult(BaseModel):
+    ai_comment: str
+    ai_comment_model: str
 
 
 class ImportAnalyzeRequest(BaseModel):

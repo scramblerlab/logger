@@ -33,6 +33,15 @@ export default function WritePage() {
   const [submitting, setSubmitting] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [classifyMsg, setClassifyMsg] = useState('');
+  const [commenting, setCommenting] = useState(false);
+  const [commentMsg, setCommentMsg] = useState('');
+  const [currentComment, setCurrentComment] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   const heroDrop = useRef<HTMLDivElement>(null);
 
@@ -50,6 +59,7 @@ export default function WritePage() {
         }
         const url = heroImageUrl(art.slug, art.hero_image, art.updated_at);
         if (url) setHeroPreview(url);
+        if (art.ai_comment) setCurrentComment(art.ai_comment);
       }).catch(() => {});
       fetch(`/static/articles/${editSlug}/article.json`)
         .then((r) => r.ok ? r.json() : null)
@@ -103,6 +113,17 @@ export default function WritePage() {
       }
     } catch { setClassifyMsg('エラーが発生しました'); }
     finally { setClassifying(false); }
+  };
+
+  const handleAiComment = async () => {
+    if (!editSlug) return;
+    setCommenting(true); setCommentMsg('');
+    try {
+      const result = await api.articles.aiComment(editSlug);
+      setCurrentComment(result.ai_comment);
+      setCommentMsg(`生成完了 (${result.ai_comment_model})`);
+    } catch { setCommentMsg('エラーが発生しました'); }
+    finally { setCommenting(false); }
   };
 
   const removeExistingImage = (rel: string) => {
@@ -199,7 +220,7 @@ export default function WritePage() {
         <div>
           <label className={labelCls}>本文 (Markdown)</label>
           <div data-color-mode="dark">
-            <MDEditor value={body} onChange={(v) => setBody(v ?? '')} height={400} />
+            <MDEditor value={body} onChange={(v) => setBody(v ?? '')} height={400} preview={isMobile ? 'edit' : 'live'} />
           </div>
         </div>
 
@@ -253,6 +274,28 @@ export default function WritePage() {
               </span>
             )}
           </div>
+          {editSlug && (
+            <div className="mb-2 space-y-2">
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={handleAiComment} disabled={commenting}
+                  className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40 transition-colors whitespace-nowrap"
+                >
+                  {commenting ? '⏳ 生成中...' : '✦ AIコメント追加/変更'}
+                </button>
+                {commentMsg && (
+                  <span className={`text-xs ${commentMsg.includes('エラー') ? 'text-red-400' : 'text-amber-400'}`}>
+                    {commentMsg}
+                  </span>
+                )}
+              </div>
+              {currentComment && (
+                <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                  <p className="text-xs font-semibold text-amber-400 mb-1">✦ AIコメント（現在）</p>
+                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{currentComment}</p>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {categories.map((cat) => (
               <button key={cat.slug} type="button" onClick={() => toggleCat(cat.slug)}

@@ -10,3 +10,16 @@ body {
 .prose img {
   @apply rounded-lg shadow-md my-4 w-full;
 }
+
+/* MDEditor mobile tweaks */
+@media (max-width: 767px) {
+  .w-md-editor-toolbar ul li button {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 18px;
+  }
+  .w-md-editor-toolbar {
+    flex-wrap: wrap;
+    padding: 4px 2px;
+  }
+}

@@ -60,6 +60,37 @@ async def init_db():
                 )
             await conn.execute(text("PRAGMA user_version = 1"))
 
+        if version < 2:
+            await conn.execute(text("ALTER TABLE articles ADD COLUMN ai_comment TEXT"))
+            await conn.execute(text("ALTER TABLE articles ADD COLUMN ai_comment_model TEXT"))
+            await conn.execute(text("PRAGMA user_version = 2"))
+
+        if version < 3:
+            # Fix broken triggers: old triggers matched FTS by content, but FTS stores
+            # tokenized text so the content-match delete always fails with SQL logic error.
+            # New triggers: use rowid-only delete, and articles_au only fires on title/body.
+            for trig in ("articles_ai", "articles_au", "articles_ad"):
+                await conn.execute(text(f"DROP TRIGGER IF EXISTS {trig}"))
+            await conn.execute(text("""
+                CREATE TRIGGER articles_ai AFTER INSERT ON articles BEGIN
+                    INSERT INTO articles_fts(rowid, title, body)
+                    VALUES (new.rowid, new.title, new.body);
+                END
+            """))
+            await conn.execute(text("""
+                CREATE TRIGGER articles_au AFTER UPDATE OF title, body ON articles BEGIN
+                    INSERT INTO articles_fts(articles_fts, rowid) VALUES ('delete', old.rowid);
+                    INSERT INTO articles_fts(rowid, title, body)
+                    VALUES (new.rowid, new.title, new.body);
+                END
+            """))
+            await conn.execute(text("""
+                CREATE TRIGGER articles_ad AFTER DELETE ON articles BEGIN
+                    INSERT INTO articles_fts(articles_fts, rowid) VALUES ('delete', old.rowid);
+                END
+            """))
+            await conn.execute(text("PRAGMA user_version = 3"))
+
     # Seed categories
     async with SessionLocal() as session:
         from sqlalchemy import select
