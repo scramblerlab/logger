@@ -1,7 +1,10 @@
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy import select, func, text
@@ -11,8 +14,8 @@ from slugify import slugify
 from auth import get_current_user
 from database import get_db, SessionLocal
 from models import Article, Tag
-from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AIClassifyResult, BulkCategorizeRequest
-from services import storage, ai_classifier, task_manager
+from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AIClassifyResult, AICommentResult, BulkCategorizeRequest
+from services import storage, ai_classifier, ai_commenter, task_manager
 from services.tokenizer import tokenize_ja
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
@@ -71,6 +74,21 @@ async def list_articles(
         page=page,
         limit=limit,
     )
+
+
+@router.post("/ai-comment-bulk", status_code=202)
+async def ai_comment_bulk(_: str = Depends(get_current_user)):
+    """Start background AI comment generation for all articles missing ai_comment."""
+    if task_manager.is_comment_running():
+        raise HTTPException(409, "AI comment generation already running")
+    await task_manager.start_comment(SessionLocal, ai_commenter)
+    return {"started": True}
+
+
+@router.get("/ai-comment-bulk/status")
+async def ai_comment_bulk_status():
+    """Return current AI comment generation task state (public — read-only)."""
+    return task_manager.get_comment_state()
 
 
 @router.get("/{slug}", response_model=ArticleOut)
@@ -159,8 +177,9 @@ async def create_article(
     await db.commit()
     await db.refresh(article)
 
-    # Kick off background AI for any uncategorized articles (no-op if already running or nothing to do)
+    # Kick off background AI for any uncategorized/uncommented articles
     await task_manager.start(SessionLocal, ai_classifier)
+    await task_manager.start_comment(SessionLocal, ai_commenter)
 
     return ArticleOut.model_validate(article)
 
@@ -178,6 +197,7 @@ async def ai_categorize_all(_: str = Depends(get_current_user)):
     if task_manager.is_running():
         raise HTTPException(409, "AI categorization already running")
     await task_manager.start(SessionLocal, ai_classifier)
+    await task_manager.start_comment(SessionLocal, ai_commenter)
     return {"started": True}
 
 
@@ -208,6 +228,29 @@ async def bulk_categorize(
     return {"updated": len(articles)}
 
 
+@router.post("/{slug}/ai-comment", response_model=AICommentResult)
+async def ai_comment_single(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    """Generate or refresh the AI comment for a single article."""
+    result = await db.execute(select(Article).where(Article.slug == slug))
+    article = result.scalar_one_or_none()
+    if not article:
+        raise HTTPException(404, "Article not found")
+    comment, comment_model = await ai_commenter.generate(article.title, article.body)
+    article.ai_comment = comment
+    article.ai_comment_model = comment_model
+    art_json = storage.read_article_json(slug)
+    if art_json:
+        art_json["ai_comment"] = comment
+        art_json["ai_comment_model"] = comment_model
+        storage.write_article_json(slug, art_json)
+    await db.commit()
+    return AICommentResult(ai_comment=comment, ai_comment_model=comment_model)
+
+
 @router.put("/{slug}", response_model=ArticleOut)
 async def update_article(
     slug: str,
@@ -216,6 +259,7 @@ async def update_article(
     categories: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     published_at: Optional[str] = Form(None),
+    ai_comment: Optional[str] = Form(None),
     remove_image_paths: str = Form("[]"),
     reuse_image_as_hero: Optional[str] = Form(None),
     hero_image: Optional[UploadFile] = File(None),
@@ -246,6 +290,8 @@ async def update_article(
             article.published_at = datetime.fromisoformat(published_at)
         except ValueError:
             pass
+    if ai_comment is not None:
+        article.ai_comment = ai_comment
 
     # Remove requested images from disk (rel_path values match article.json additionalImages entries)
     from pathlib import Path
@@ -298,6 +344,8 @@ async def update_article(
             art_json["heroImage"] = article.hero_image
         if published_at is not None:
             art_json["publishedAt"] = article.published_at.isoformat() if article.published_at else None
+        if ai_comment is not None:
+            art_json["ai_comment"] = ai_comment
         art_json["additionalImages"] = all_extras
         storage.write_article_json(slug, art_json)
 

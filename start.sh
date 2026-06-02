@@ -32,15 +32,25 @@ cd "$PROJECT_DIR/backend"
 BACKEND_PID=$!
 
 # --- Frontend ---
-echo "Starting frontend on port 5173..."
+echo "Building frontend..."
 cd "$PROJECT_DIR/frontend"
+npm run build
+echo "Starting frontend on port 5173..."
 npm run dev &
 FRONTEND_PID=$!
 
 # --- CloudFlare Tunnel ---
-echo "Starting CloudFlare tunnel..."
-cloudflared tunnel --config "$PROJECT_DIR/cloudflare/config.yml" run &>/tmp/cloudflared.log &
+CF_CONFIG="$PROJECT_DIR/cloudflare/config.yml"
+CF_HOSTNAME=$(grep -E '^\s+hostname:' "$CF_CONFIG" | head -1 | awk '{print $2}')
+echo "Starting CloudFlare tunnel (exposing https://${CF_HOSTNAME})..."
+cloudflared tunnel --config "$CF_CONFIG" run &>/tmp/cloudflared.log &
 CLOUDFLARED_PID=$!
+sleep 2
+if kill -0 "$CLOUDFLARED_PID" 2>/dev/null; then
+  echo "CloudFlare tunnel running -> https://${CF_HOSTNAME}"
+else
+  echo "CloudFlare tunnel failed to start. Check /tmp/cloudflared.log"
+fi
 
 echo ""
 echo "  Backend:  http://localhost:8000"

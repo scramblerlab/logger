@@ -20,7 +20,7 @@ export default function Sidebar({
   onOpenCategoryEdit, onBulkCategorize, onShopifyExport,
 }: Props) {
   const { isEditor } = useAuth();
-  const { status: aiStatus, progress: aiProgress, startJob } = useAiJob();
+  const { status: aiStatus, progress: aiProgress, startJob, commentStatus, commentProgress, startCommentJob } = useAiJob();
   return (
     <aside className="w-64 flex-shrink-0 space-y-6">
       <div>
@@ -58,6 +58,21 @@ export default function Sidebar({
         {/* AI progress */}
         {aiStatus !== 'idle' && aiProgress && (
           <p className="text-xs text-amber-400 mb-2">{aiProgress}</p>
+        )}
+        {isEditor && (
+          <div className="flex items-center gap-1.5 mb-2">
+            <button
+              onClick={startCommentJob}
+              disabled={commentStatus === 'running'}
+              title="AIコメント一括追加"
+              className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold transition-colors whitespace-nowrap"
+            >
+              {commentStatus === 'running' ? '⏳ AIコメント中...' : 'AIコメント追加'}
+            </button>
+          </div>
+        )}
+        {commentStatus !== 'idle' && commentProgress && (
+          <p className="text-xs text-amber-400 mb-2">{commentProgress}</p>
         )}
 
         <ul className="space-y-0.5">

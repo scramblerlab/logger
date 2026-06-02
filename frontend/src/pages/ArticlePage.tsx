@@ -86,6 +86,18 @@ export default function ArticlePage() {
 
       {date && <p className="text-sm text-slate-500 mb-6">{date}</p>}
 
+      {article.ai_comment && (
+        <div className="mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold text-amber-400 tracking-wide">✦ AIコメント</span>
+            {article.ai_comment_model && (
+              <span className="text-xs text-slate-500">by {article.ai_comment_model}</span>
+            )}
+          </div>
+          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{article.ai_comment}</p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1.5 mb-8">
         {article.tags.map((tag) => (
           <Link key={tag} to={`/?tag=${encodeURIComponent(tag)}`}

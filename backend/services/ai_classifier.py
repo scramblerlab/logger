@@ -2,8 +2,8 @@
 AI classifier using a local Ollama model.
 Configure via backend/.env: OLLAMA_BASE_URL, OLLAMA_MODEL.
 """
-import os
 import re
+from services import ollama_client
 
 KNOWN_CATEGORIES = [
     "bike", "onsen", "sentou", "container", "cooking",
@@ -29,7 +29,6 @@ TAGS: yamaha, sr400, custom, frame, welding"""
 
 
 def _parse_response(text: str) -> dict:
-    """Extract categories and tags from a plain-text labeled response."""
     cats: list[str] = []
     tags: list[str] = []
 
@@ -44,32 +43,15 @@ def _parse_response(text: str) -> dict:
             raw = line[len("tags:"):].strip()
             tags = [t.strip().lower() for t in re.split(r"[,\s]+", raw) if t.strip()]
 
-    # Filter categories against the known list; keep tags as-is (up to 5)
     cats = [c for c in cats if c in KNOWN_CATEGORIES]
     tags = [t for t in tags if t][:5]
     return {"categories": cats, "tags": tags}
 
 
 async def classify(title: str, body_excerpt: str) -> dict:
-    import httpx
-
-    base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    model = os.getenv("OLLAMA_MODEL", "gemma4:e2b-mlx")
     prompt = f"Title: {title}\n\nContent excerpt:\n{body_excerpt[:800]}"
-
-    async with httpx.AsyncClient(timeout=120) as client:
-        r = await client.post(
-            f"{base}/api/chat",
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                "stream": False,
-            },
-        )
-        r.raise_for_status()
-        raw = r.json()["message"]["content"].strip()
-
+    raw = await ollama_client.chat([
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ])
     return _parse_response(raw)

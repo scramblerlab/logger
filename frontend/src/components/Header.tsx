@@ -29,8 +29,8 @@ export default function Header({ onSearch }: Props) {
     <>
       <header className="bg-surface border-b border-rim sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
-          <Link to="/" className="font-display text-2xl tracking-widest text-amber-400 flex-shrink-0">
-            logger
+          <Link to="/" className="font-display text-xl tracking-wide text-amber-400 flex-shrink-0">
+            GENERATIVE LOGGER
           </Link>
           <form onSubmit={handleSearch} className="flex-1 max-w-md">
             <div className="relative">
