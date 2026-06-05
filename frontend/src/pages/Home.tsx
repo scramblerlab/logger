@@ -10,6 +10,8 @@ import ShopifyExportDialog from '../components/ShopifyExportDialog';
 import ShopifyExportPanel from '../components/ShopifyExportPanel';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
+import { useTranslation } from '../context/TranslationContext';
+import LoginModal from '../components/LoginModal';
 
 const PAGE_SIZE = 18;
 
@@ -24,6 +26,10 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<ArticleCardType[] | null>(null);
   const [showCategoryEdit, setShowCategoryEdit] = useState(false);
   const [heroArticle, setHeroArticle] = useState<ArticleCardType | null>(null);
+  const [translatedTitles, setTranslatedTitles] = useState<Map<string, string> | null>(null);
+  const [translatedCategoryLabels, setTranslatedCategoryLabels] = useState<Map<string, string> | null>(null);
+  const [translatedLabels, setTranslatedLabels] = useState<{ category: string; all: string; tag: string } | null>(null);
+  const [showLogin, setShowLogin] = useState(false);
 
   const activeCategory = searchParams.get('category') ?? localStorage.getItem('activeCategory');
   const activeTag = searchParams.get('tag');
@@ -42,8 +48,9 @@ export default function Home() {
   const [shopifyCreds, setShopifyCreds] = useState<{ shopUrl: string; clientId: string; clientSecret: string; blogId: string; blogTitle: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loaderRef = useRef<HTMLDivElement>(null);
-  const { isEditor } = useAuth();
+  const { isEditor, logout } = useAuth();
   const { status: aiStatus, progress: aiProgress, startJob, setOnComplete, commentStatus, commentProgress, startCommentJob } = useAiJob();
+  const { registerHandlers } = useTranslation();
 
   useEffect(() => {
     api.articles.list({ page: 1, limit: 1, sort: 'published' }).then((data) => {
@@ -126,6 +133,46 @@ export default function Home() {
 
 
   const displayedArticles = searchResults ?? articles;
+
+  const displayedArticlesRef = useRef(displayedArticles);
+  const categoriesRef = useRef(categories);
+  useEffect(() => { displayedArticlesRef.current = displayedArticles; }, [displayedArticles]);
+  useEffect(() => { categoriesRef.current = categories; }, [categories]);
+
+  useEffect(() => {
+    registerHandlers({
+      onSelect: async (language) => {
+        const arts = displayedArticlesRef.current;
+        const cats = categoriesRef.current;
+        const [titlesResult, catsResult, labelsResult] = await Promise.all([
+          arts.length > 0
+            ? api.translate.titles({ titles: arts.map((a) => a.title), target_language: language })
+            : Promise.resolve({ titles: [] as string[] }),
+          cats.length > 0
+            ? api.translate.titles({ titles: cats.map((c) => c.name_ja), target_language: language })
+            : Promise.resolve({ titles: [] as string[] }),
+          api.translate.titles({ titles: ['カテゴリー', 'すべて', 'タグ'], target_language: language }),
+        ]);
+        setTranslatedTitles(new Map(arts.map((a, i) => [a.id, titlesResult.titles[i] ?? a.title])));
+        setTranslatedCategoryLabels(new Map(cats.map((c, i) => [c.slug, catsResult.titles[i] ?? c.name_ja])));
+        setTranslatedLabels({
+          category: labelsResult.titles[0] ?? 'カテゴリー',
+          all: labelsResult.titles[1] ?? 'すべて',
+          tag: labelsResult.titles[2] ?? 'タグ',
+        });
+      },
+      onReset: () => {
+        setTranslatedTitles(null);
+        setTranslatedCategoryLabels(null);
+        setTranslatedLabels(null);
+      },
+    });
+    return () => registerHandlers(null);
+  }, [registerHandlers]);
+
+  const finalArticles = translatedTitles
+    ? displayedArticles.map((a) => ({ ...a, title: translatedTitles.get(a.id) ?? a.title }))
+    : displayedArticles;
 
   useEffect(() => {
     const saved = localStorage.getItem('activeCategory');
@@ -213,28 +260,47 @@ export default function Home() {
         </div>
       )}
 
-      {/* Mobile: category tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-6 lg:hidden">
-        <button
-          onClick={() => handleSelectCategory(null)}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-            !activeCategory ? 'bg-amber-500 text-black' : 'bg-surface text-slate-400 border border-rim hover:bg-surface2'
-          }`}
-        >
-          All
-        </button>
-        {categories.map((c) => (
+      {/* Mobile: category tabs + auth */}
+      <div className="lg:hidden mb-6">
+        <div className="flex gap-2 overflow-x-auto pb-2">
           <button
-            key={c.slug}
-            onClick={() => handleSelectCategory(c.slug)}
+            onClick={() => handleSelectCategory(null)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-              activeCategory === c.slug ? 'text-white' : 'bg-surface text-slate-400 border border-rim hover:bg-surface2'
+              !activeCategory ? 'bg-amber-500 text-black' : 'bg-surface text-slate-400 border border-rim hover:bg-surface2'
             }`}
-            style={activeCategory === c.slug ? { backgroundColor: c.color } : {}}
           >
-            {c.name_ja}{c.article_count > 0 && <span className="ml-1 opacity-60 text-xs">{c.article_count}</span>}
+            {translatedLabels?.all ?? 'All'}
           </button>
-        ))}
+          {categories.map((c) => (
+            <button
+              key={c.slug}
+              onClick={() => handleSelectCategory(c.slug)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                activeCategory === c.slug ? 'text-white' : 'bg-surface text-slate-400 border border-rim hover:bg-surface2'
+              }`}
+              style={activeCategory === c.slug ? { backgroundColor: c.color } : {}}
+            >
+              {translatedCategoryLabels?.get(c.slug) ?? c.name_ja}{c.article_count > 0 && <span className="ml-1 opacity-60 text-xs">{c.article_count}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex">
+          {isEditor ? (
+            <button
+              onClick={() => logout()}
+              className="text-xs px-3 py-1.5 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors"
+            >
+              ログアウト
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowLogin(true)}
+              className="text-xs px-3 py-1.5 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors"
+            >
+              ログイン
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-8">
@@ -247,6 +313,8 @@ export default function Home() {
             onOpenCategoryEdit={() => setShowCategoryEdit(true)}
             onBulkCategorize={enterBulkMode}
             onShopifyExport={enterExportMode}
+            categoryLabels={translatedCategoryLabels ?? undefined}
+            labels={translatedLabels ?? undefined}
           />
         </div>
 
@@ -280,27 +348,27 @@ export default function Home() {
             </div>
           )}
 
-          {displayedArticles.length === 0 && !loading ? (
+          {finalArticles.length === 0 && !loading ? (
             <div className="text-center py-20 text-slate-500">
               <p className="text-lg">記事がありません</p>
               <p className="text-sm mt-2">Write a new article or import from an existing site</p>
             </div>
           ) : (
             <div className="flex flex-col gap-5">
-              {displayedArticles[0] && (
+              {finalArticles[0] && (
                 <ArticleCard
-                  key={displayedArticles[0].id}
-                  article={displayedArticles[0]}
+                  key={finalArticles[0].id}
+                  article={finalArticles[0]}
                   categories={categories}
                   featured={true}
                   selectable={bulkMode || exportMode}
-                  selected={selectedIds.has(displayedArticles[0].id)}
+                  selected={selectedIds.has(finalArticles[0].id)}
                   onSelect={toggleSelect}
                 />
               )}
-              {displayedArticles.length > 1 && (
+              {finalArticles.length > 1 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {displayedArticles.slice(1).map((article) => (
+                  {finalArticles.slice(1).map((article) => (
                     <ArticleCard
                       key={article.id}
                       article={article}
@@ -365,6 +433,7 @@ export default function Home() {
         />
       )}
     </div>
+    {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
     </>
   );
 }
