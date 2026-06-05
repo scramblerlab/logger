@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api } from '../api/client';
+import { api, heroImageUrl } from '../api/client';
 import type { ArticleCard as ArticleCardType, Category, Tag } from '../types';
 import ArticleCard from '../components/ArticleCard';
 import Sidebar from '../components/Sidebar';
@@ -23,6 +23,7 @@ export default function Home() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [searchResults, setSearchResults] = useState<ArticleCardType[] | null>(null);
   const [showCategoryEdit, setShowCategoryEdit] = useState(false);
+  const [heroArticle, setHeroArticle] = useState<ArticleCardType | null>(null);
 
   const activeCategory = searchParams.get('category') ?? localStorage.getItem('activeCategory');
   const activeTag = searchParams.get('tag');
@@ -43,6 +44,12 @@ export default function Home() {
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor } = useAuth();
   const { status: aiStatus, progress: aiProgress, startJob, setOnComplete, commentStatus, commentProgress, startCommentJob } = useAiJob();
+
+  useEffect(() => {
+    api.articles.list({ page: 1, limit: 1, sort: 'published' }).then((data) => {
+      if (data.items[0]?.hero_image) setHeroArticle(data.items[0]);
+    }).catch(() => {});
+  }, []);
 
   const reloadCategories = useCallback(() => {
     api.categories.list().then(setCategories).catch(() => {});
@@ -150,6 +157,17 @@ export default function Home() {
   };
 
   return (
+    <>
+    {heroArticle && (
+      <div className="relative h-[150px] overflow-hidden">
+        <img
+          src={heroImageUrl(heroArticle.slug, heroArticle.hero_image) ?? undefined}
+          alt={heroArticle.title}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-black/70" />
+      </div>
+    )}
     <div className={`max-w-7xl mx-auto px-4 py-8 ${bulkMode || exportMode ? 'pb-28' : ''}`}>
       {/* Mobile: action buttons (editor only) */}
       {isEditor && (
@@ -268,17 +286,32 @@ export default function Home() {
               <p className="text-sm mt-2">Write a new article or import from an existing site</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {displayedArticles.map((article) => (
+            <div className="flex flex-col gap-5">
+              {displayedArticles[0] && (
                 <ArticleCard
-                  key={article.id}
-                  article={article}
+                  key={displayedArticles[0].id}
+                  article={displayedArticles[0]}
                   categories={categories}
+                  featured={true}
                   selectable={bulkMode || exportMode}
-                  selected={selectedIds.has(article.id)}
+                  selected={selectedIds.has(displayedArticles[0].id)}
                   onSelect={toggleSelect}
                 />
-              ))}
+              )}
+              {displayedArticles.length > 1 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                  {displayedArticles.slice(1).map((article) => (
+                    <ArticleCard
+                      key={article.id}
+                      article={article}
+                      categories={categories}
+                      selectable={bulkMode || exportMode}
+                      selected={selectedIds.has(article.id)}
+                      onSelect={toggleSelect}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -332,5 +365,6 @@ export default function Home() {
         />
       )}
     </div>
+    </>
   );
 }
