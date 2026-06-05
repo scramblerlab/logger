@@ -9,7 +9,10 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 | Feature | Details |
 |---|---|
 | **Post articles** | Web UI with Markdown editor, hero image drag-and-drop, bilingual title (EN/JA) |
+| **Web article extraction** | Paste any URL → title, body (Markdown), and images auto-fill the editor; source URL recorded |
 | **AI tagging** | Per-article "✦ AI分析" button — local Ollama model auto-assigns categories and tags |
+| **AI comment** | One-click AI-generated commentary per article; bulk generation from the sidebar |
+| **AI page translation** | Translate LP card titles or full article (title + body + AI comment) into 8 languages on demand via Ollama; reverts on reload |
 | **Bulk AI classify** | "AI分類" button classifies all uncategorized articles in one background pass |
 | **Category management** | Add / delete categories from the sidebar; article counts shown inline |
 | **Bulk category update** | Select multiple articles and add/remove categories in one operation |
@@ -31,6 +34,7 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 |---|---|
 | Backend | Python 3.12, FastAPI, SQLAlchemy async, SQLite |
 | AI | Ollama (local) — `gemma4:e2b-mlx` (Apple Silicon MLX, ~7 GB) |
+| AI (translation) | Ollama (local) — `qwen3.5:4b` (translation, classification, comment) |
 | Scraping | `httpx` + `BeautifulSoup4` + WordPress REST API / Shopify GraphQL |
 | Frontend | React 18, Vite, TypeScript, Tailwind CSS, dark theme |
 | Tunnel | `cloudflared` (Homebrew), Mac launchd autostart |
@@ -53,7 +57,9 @@ logger/
 │   │   ├── categories.py    # Category list + CRUD + tag counts
 │   │   ├── search.py        # FTS5 full-text search
 │   │   ├── importer.py      # WordPress bulk import (SSE streaming)
-│   │   └── shopify_importer.py  # Shopify import + export (SSE streaming)
+│   │   ├── shopify_importer.py  # Shopify import + export (SSE streaming)
+│   │   ├── translate.py     # On-demand page translation via Ollama
+│   │   └── extract.py       # Single-URL web article extraction
 │   ├── services/
 │   │   ├── ai_classifier.py # Ollama API: auto-categorise + tag
 │   │   ├── ai_chat.py       # Ollama API: Ask AI feature with DB + web search
@@ -61,6 +67,8 @@ logger/
 │   │   ├── tokenizer.py     # Japanese FTS tokenizer (fugashi + UniDic)
 │   │   ├── wp_importer.py   # WordPress importer (REST API / sitemap / scrape)
 │   │   ├── shopify_service.py  # Shopify GraphQL: list blogs, import, export
+│   │   ├── translator.py    # Ollama-backed translation (article + titles batch)
+│   │   ├── web_extractor.py # Generic HTML scraper: lazy-image resolve, noise strip
 │   │   └── storage.py       # Image save/optimise, article.json read/write
 │   ├── data/                # ⚠ NOT in git — see "Article Data" section below
 │   │   ├── blog.db          # SQLite database
@@ -82,9 +90,11 @@ logger/
 │   │   │   ├── ImportPage.tsx        # WordPress bulk import UI
 │   │   │   └── ShopifyImportPage.tsx # Shopify bulk import UI (3-step flow)
 │   │   ├── components/
-│   │   │   ├── Header.tsx            # Sticky header with search + Write button
+│   │   │   ├── Header.tsx            # Sticky header: search, Translate, Web記事抽出, Write
 │   │   │   ├── ArticleCard.tsx       # Card: hero image, category badge, tags; selectable
-│   │   │   ├── Sidebar.tsx           # Category nav + AI classify + tag cloud + import links
+│   │   │   ├── Sidebar.tsx           # Category nav + AI classify + tag cloud + login
+│   │   │   ├── TranslateButton.tsx   # Language dropdown for on-demand translation
+│   │   │   ├── ExtractDialog.tsx     # URL input dialog for web article extraction
 │   │   │   ├── BulkCategoryPanel.tsx # Fixed bottom bar for bulk category updates
 │   │   │   ├── CategoryBadge.tsx     # Colored category chip
 │   │   │   ├── CategoryEditModal.tsx # Add/delete categories
@@ -93,7 +103,8 @@ logger/
 │   │   │   └── ShopifyExportPanel.tsx   # Fixed bottom bar for Shopify export
 │   │   ├── context/
 │   │   │   ├── AuthContext.tsx       # Editor auth state + login/logout
-│   │   │   └── AiJobContext.tsx      # Background AI job polling + status
+│   │   │   ├── AiJobContext.tsx      # Background AI job polling + status
+│   │   │   └── TranslationContext.tsx   # Global translating/translated state + handler registry
 │   │   ├── api/client.ts             # Fetch wrapper against FastAPI
 │   │   └── types.ts                  # Shared TypeScript types
 │   ├── vite.config.ts                # Proxy /api and /static → localhost:8000
@@ -102,7 +113,13 @@ logger/
 │   ├── config.yml           # cloudflared tunnel config (fill in TUNNEL_ID)
 │   └── setup.md             # Step-by-step CloudFlare tunnel setup guide
 ├── docs/
-│   └── shopify-import-export.md  # Shopify feature design notes
+│   ├── web-article-extraction.md # Web scraping: lazy-image handling, extractor design
+│   ├── wordpress-import.md       # WordPress bulk import implementation notes
+│   ├── shopify-import-export.md  # Shopify feature design notes
+│   ├── japanese-fts-tokenizer.md # FTS5 + fugashi tokenizer notes
+│   ├── auth-design.md            # httpOnly cookie auth design
+│   ├── cloudflare-tunnel.md      # CloudFlare tunnel setup
+│   └── ai-background-service.md  # Background AI classification service
 ├── setup.sh                 # First-time setup (deps + Ollama + model pull)
 ├── start.sh                 # Start Ollama + both servers with one command
 └── .gitignore
@@ -308,6 +325,38 @@ Both WordPress and Shopify importers automatically trigger a background AI class
 
 ---
 
+## Web記事抽出
+
+任意のURLから記事コンテンツをワンクリックで取り込む。
+
+1. ログインして、ヘッダーの **「Web記事抽出」** ボタンをクリック
+2. 記事のURLを入力して **「抽出」** をクリック
+3. バックエンドがHTMLをスクレイピングし、Markdownに変換 + 画像をダウンロード（数秒かかる場合あり）
+4. 記事投稿画面に自動遷移 — タイトル・本文・ヒーロー画像・追加画像がプリフィルされる
+5. 内容を確認・編集して **「投稿する」**
+
+出典URLは本文末尾に自動追記され、`source_url` としてDBにも保存される。
+
+> **実装ノート:** [`docs/web-article-extraction.md`](docs/web-article-extraction.md) — 遅延ロード画像の解決、ノイズ除去、拡張設計などの詳細。
+
+---
+
+## AI翻訳 (On-demand Page Translation)
+
+ページコンテンツをローカルOllamaモデルでオンデマンド翻訳する。DBには保存されず、リロードで日本語に戻る。
+
+**対応言語:** English / Français / Español / Italiano / Deutsch / Ελληνικά / 中文 / 한국어
+
+**LP（一覧ページ）:**
+- ヘッダーの **「AI Translate」** ボタン → 言語を選択
+- 全記事カードのタイトル + カテゴリーラベル（カテゴリー / すべて / タグ）が翻訳される
+
+**記事詳細ページ:**
+- 同ボタンで title + body (Markdown) + AIコメントが翻訳される
+- **「↩ Reset」** で元の日本語に戻す
+
+---
+
 ## WordPress Import
 
 1. Open http://localhost:5173/import
@@ -415,6 +464,9 @@ Once running, the app is accessible at your chosen hostname (e.g., `https://log.
 | `POST` | `/api/articles/ai-categorize` | ✓ | Start bulk background classification |
 | `GET` | `/api/articles/ai-categorize/status` | — | Poll background job status |
 | `PATCH` | `/api/articles/bulk-categorize` | ✓ | Add/remove categories on multiple articles |
+| `POST` | `/api/articles/{slug}/ai-comment` | ✓ | Generate AI comment for a single article |
+| `POST` | `/api/articles/ai-comment-bulk` | ✓ | Start bulk AI comment generation |
+| `GET` | `/api/articles/ai-comment-bulk/status` | — | Poll bulk comment job status |
 
 ### Categories & Tags
 
@@ -440,6 +492,14 @@ Once running, the app is accessible at your chosen hostname (e.g., `https://log.
 | `POST` | `/api/shopify/blogs` | — | List blogs in a Shopify store |
 | `POST` | `/api/shopify/import` | ✓ | Bulk import from Shopify blog (SSE stream) |
 | `POST` | `/api/shopify/export` | ✓ | Export selected articles to Shopify (SSE stream) |
+
+### Translation & Extraction
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/translate/article` | — | Translate title + body + ai_comment to target language |
+| `POST` | `/api/translate/titles` | — | Batch-translate a list of article titles |
+| `POST` | `/api/extract/url` | ✓ | Scrape a URL → return title, Markdown body, staged images |
 
 ### Auth
 

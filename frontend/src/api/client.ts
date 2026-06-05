@@ -84,6 +84,14 @@ export const api = {
         body: JSON.stringify({ question }),
       }),
   },
+  extract: {
+    url: (data: { url: string }): Promise<{ staging_slug: string; title: string; body: string; hero_url: string | null; additional_urls: string[]; published_at: string | null; source_url: string }> =>
+      request('/extract/url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+  },
   translate: {
     article: (data: { title: string; body: string; ai_comment: string | null; target_language: string }): Promise<{ title: string; body: string; ai_comment: string | null }> =>
       request('/translate/article', {
