@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import MDEditor from '@uiw/react-md-editor';
 import { api, heroImageUrl } from '../api/client';
 import type { Category } from '../types';
@@ -9,6 +9,7 @@ const inputCls = 'w-full bg-surface2 border border-rim2 text-slate-100 placehold
 
 export default function WritePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const editSlug = searchParams.get('edit');
   const { isEditor, isLoading } = useAuth();
@@ -30,6 +31,7 @@ export default function WritePage() {
   const [removedImages, setRemovedImages] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [publishedAt, setPublishedAt] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [classifying, setClassifying] = useState(false);
   const [classifyMsg, setClassifyMsg] = useState('');
@@ -67,6 +69,36 @@ export default function WritePage() {
         .catch(() => {});
     }
   }, [editSlug]);
+
+  // Initialize from web extraction state (new article only)
+  useEffect(() => {
+    if (editSlug) return;
+    const extraction = (location.state as { extraction?: { title: string; body: string; hero_url: string | null; additional_urls: string[]; published_at: string | null; source_url: string } } | null)?.extraction;
+    if (!extraction) return;
+    setTitle(extraction.title);
+    setBody(extraction.body);
+    setSourceUrl(extraction.source_url ?? '');
+    if (extraction.published_at) setPublishedAt(extraction.published_at.slice(0, 16));
+    if (extraction.hero_url) {
+      fetch(extraction.hero_url)
+        .then((r) => r.blob())
+        .then((blob) => {
+          setHeroFile(new File([blob], 'hero.jpg', { type: 'image/jpeg' }));
+          setHeroPreview(URL.createObjectURL(blob));
+        })
+        .catch(() => {});
+    }
+    for (const url of extraction.additional_urls ?? []) {
+      fetch(url)
+        .then((r) => r.blob())
+        .then((blob) => {
+          const fname = url.split('/').pop() || 'image.jpg';
+          setAdditionalFiles((prev) => [...prev, new File([blob], fname, { type: 'image/jpeg' })]);
+        })
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleHeroDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -151,6 +183,7 @@ export default function WritePage() {
         navigate(`/articles/${editSlug}`);
       } else {
         form.append('auto_classify', selectedCats.length === 0 ? 'true' : 'false');
+        if (sourceUrl) form.append('source_url', sourceUrl);
         if (heroFile) form.append('hero_image', heroFile);
         for (const f of additionalFiles) form.append('additional_images', f);
         const created = await api.articles.create(form);

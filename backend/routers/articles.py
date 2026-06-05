@@ -108,6 +108,7 @@ async def create_article(
     tags: str = Form("[]"),
     published_at: Optional[str] = Form(None),
     auto_classify: bool = Form(True),
+    source_url: Optional[str] = Form(None),
     hero_image: Optional[UploadFile] = File(None),
     additional_images: list[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
@@ -154,6 +155,7 @@ async def create_article(
         categories=json.dumps(cats, ensure_ascii=False),
         tags=json.dumps(tag_list, ensure_ascii=False),
         published_at=pub_dt,
+        source_url=source_url,
         data_path=f"articles/{slug}",
     )
     db.add(article)

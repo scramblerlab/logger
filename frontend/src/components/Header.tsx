@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
 import { useTranslation } from '../context/TranslationContext';
 import TranslateButton from './TranslateButton';
+import ExtractDialog from './ExtractDialog';
 
 interface Props {
   onSearch: (q: string) => void;
@@ -11,6 +12,7 @@ interface Props {
 
 export default function Header({ onSearch }: Props) {
   const [query, setQuery] = useState('');
+  const [showExtract, setShowExtract] = useState(false);
   const navigate = useNavigate();
   const { isEditor } = useAuth();
   const { status: aiStatus, currentTitle: aiTitle } = useAiJob();
@@ -61,13 +63,22 @@ export default function Header({ onSearch }: Props) {
             <span className="hidden sm:inline text-xs text-emerald-400">✓ AI分類完了</span>
           )}
           {isEditor && (
-            <Link
-              to="/write"
-              className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
-            >
-              + 投稿 / Write
-            </Link>
+            <>
+              <button
+                onClick={() => setShowExtract(true)}
+                className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
+              >
+                Web記事抽出
+              </button>
+              <Link
+                to="/write"
+                className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
+              >
+                + 投稿 / Write
+              </Link>
+            </>
           )}
+          {showExtract && <ExtractDialog onClose={() => setShowExtract(false)} />}
         </nav>
       </div>
     </header>
