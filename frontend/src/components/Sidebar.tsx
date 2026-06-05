@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Category, Tag } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
+import LoginModal from './LoginModal';
 
 interface Props {
   categories: Category[];
@@ -12,21 +14,26 @@ interface Props {
   onOpenCategoryEdit: () => void;
   onBulkCategorize: () => void;
   onShopifyExport: () => void;
+  categoryLabels?: Map<string, string>;
+  labels?: { category: string; all: string; tag: string };
 }
 
 export default function Sidebar({
   categories, tags, activeCategory,
   onSelectCategory, onSelectTag,
   onOpenCategoryEdit, onBulkCategorize, onShopifyExport,
+  categoryLabels, labels,
 }: Props) {
-  const { isEditor } = useAuth();
+  const { isEditor, logout } = useAuth();
   const { status: aiStatus, progress: aiProgress, startJob, commentStatus, commentProgress, startCommentJob } = useAiJob();
+  const [showLogin, setShowLogin] = useState(false);
   return (
+    <>
     <aside className="w-64 flex-shrink-0 space-y-6">
       <div>
         {/* Category header */}
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">カテゴリー</h3>
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{labels?.category ?? 'カテゴリー'}</h3>
           {isEditor && (
             <div className="flex items-center gap-1.5">
               <button
@@ -85,7 +92,7 @@ export default function Sidebar({
                   : 'text-slate-400 hover:bg-surface2 hover:text-slate-100'
               }`}
             >
-              すべて / All
+              {labels?.all ?? 'すべて / All'}
             </button>
           </li>
           {categories.map((cat) => (
@@ -99,7 +106,7 @@ export default function Sidebar({
                 }`}
               >
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-                <span className="flex-1">{cat.name_ja}</span>
+                <span className="flex-1">{categoryLabels?.get(cat.slug) ?? cat.name_ja}</span>
                 <span className="text-slate-600 text-xs">{cat.name_en}</span>
                 {cat.article_count > 0 && (
                   <span className="text-xs text-slate-500 tabular-nums">{cat.article_count}</span>
@@ -112,7 +119,7 @@ export default function Sidebar({
 
       {tags.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">タグ</h3>
+          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">{labels?.tag ?? 'タグ'}</h3>
           <div className="flex flex-wrap gap-1.5">
             {tags.slice(0, 30).map((tag) => (
               <button
@@ -159,6 +166,25 @@ export default function Sidebar({
           </button>
         </div>
       )}
+      <div className="pt-4 border-t border-rim">
+        {isEditor ? (
+          <button
+            onClick={() => logout()}
+            className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors"
+          >
+            ログアウト
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowLogin(true)}
+            className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors"
+          >
+            ログイン
+          </button>
+        )}
+      </div>
     </aside>
+    {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+    </>
   );
 }

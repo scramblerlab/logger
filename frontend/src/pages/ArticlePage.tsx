@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, heroImageUrl } from '../api/client';
 import type { Article, Category } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/TranslationContext';
 
 export default function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -13,6 +14,12 @@ export default function ArticlePage() {
   const [article, setArticle] = useState<Article | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [translatedContent, setTranslatedContent] = useState<{ title: string; body: string; ai_comment: string | null } | null>(null);
+  const { registerHandlers } = useTranslation();
+
+  const articleRef = useRef<Article | null>(null);
+  useEffect(() => { articleRef.current = article; }, [article]);
+
   useEffect(() => {
     if (!slug) return;
     Promise.all([api.articles.get(slug), api.categories.list()])
@@ -20,6 +27,24 @@ export default function ArticlePage() {
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
   }, [slug, navigate]);
+
+  useEffect(() => {
+    registerHandlers({
+      onSelect: async (language) => {
+        const art = articleRef.current;
+        if (!art) return;
+        const result = await api.translate.article({
+          title: art.title,
+          body: art.body,
+          ai_comment: art.ai_comment,
+          target_language: language,
+        });
+        setTranslatedContent(result);
+      },
+      onReset: () => setTranslatedContent(null),
+    });
+    return () => registerHandlers(null);
+  }, [registerHandlers]);
 
   if (loading) {
     return (
@@ -81,7 +106,7 @@ export default function ArticlePage() {
       </div>
 
       <h1 className="text-3xl font-bold text-slate-100 leading-tight mb-2">
-        {article.title}
+        {translatedContent?.title ?? article.title}
       </h1>
 
       {date && <p className="text-sm text-slate-500 mb-6">{date}</p>}
@@ -94,7 +119,7 @@ export default function ArticlePage() {
               <span className="text-xs text-slate-500">by {article.ai_comment_model}</span>
             )}
           </div>
-          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{article.ai_comment}</p>
+          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{translatedContent?.ai_comment ?? article.ai_comment}</p>
         </div>
       )}
 
@@ -121,7 +146,7 @@ export default function ArticlePage() {
             },
           }}
         >
-          {article.body}
+          {translatedContent?.body ?? article.body}
         </ReactMarkdown>
       </div>
 
