@@ -352,9 +352,6 @@ async def delete_article(slug: str, db: AsyncSession = Depends(get_db), _: str =
     article = result.scalar_one_or_none()
     if not article:
         raise HTTPException(404, "Article not found")
-    rowid = (await db.execute(text("SELECT rowid FROM articles WHERE id = :id"), {"id": article.id})).scalar()
-    if rowid:
-        await db.execute(text("DELETE FROM articles_fts WHERE rowid = :rowid"), {"rowid": rowid})
     await db.delete(article)
     storage.delete_article_files(slug)
     await db.commit()
