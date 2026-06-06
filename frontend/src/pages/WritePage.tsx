@@ -7,6 +7,21 @@ import { useAuth } from '../context/AuthContext';
 
 const inputCls = 'w-full bg-surface2 border border-rim2 text-slate-100 placeholder-slate-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent';
 
+async function pollJob<T>(
+  poll: () => Promise<{ status: string; result: T | null; error: string | null }>,
+  intervalMs = 2000,
+  timeoutMs = 180000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const s = await poll();
+    if (s.status === 'done' && s.result !== null) return s.result;
+    if (s.status === 'error') throw new Error(s.error ?? 'AI処理に失敗しました');
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error('タイムアウトしました');
+}
+
 export default function WritePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,7 +150,8 @@ export default function WritePage() {
     if (!title) return;
     setClassifying(true); setClassifyMsg('');
     try {
-      const result = await api.articles.aiClassify(title, body);
+      const { job_id } = await api.articles.aiClassify(title, body);
+      const result = await pollJob(() => api.articles.aiClassifyStatus(job_id));
       if (result.categories.length > 0) {
         setSelectedCats(result.categories);
         if (result.tags.length > 0) setTags(result.tags);
@@ -143,7 +159,7 @@ export default function WritePage() {
       } else {
         setClassifyMsg('カテゴリーを判定できませんでした');
       }
-    } catch (e) { console.error('AI classify error:', e); setClassifyMsg('エラーが発生しました'); }
+    } catch { setClassifyMsg('エラーが発生しました'); }
     finally { setClassifying(false); }
   };
 
@@ -151,7 +167,8 @@ export default function WritePage() {
     if (!editSlug) return;
     setCommenting(true); setCommentMsg('');
     try {
-      const result = await api.articles.aiComment(editSlug);
+      await api.articles.aiComment(editSlug);
+      const result = await pollJob(() => api.articles.aiCommentStatus(editSlug));
       setCurrentComment(result.ai_comment);
       setCommentMsg(`生成完了 (${result.ai_comment_model})`);
     } catch { setCommentMsg('エラーが発生しました'); }
