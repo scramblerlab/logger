@@ -82,8 +82,19 @@ async def web_search(
                 return r.json().get("results", [])
         except (httpx.ConnectError, httpx.HTTPStatusError) as exc:
             last_exc = exc
-            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
-                return []
+            if isinstance(exc, httpx.HTTPStatusError):
+                status = exc.response.status_code
+                if status == 429 and attempt < max_retries:
+                    retry_after = exc.response.headers.get("Retry-After", "")
+                    delay = int(retry_after) if retry_after.isdigit() else wait * (2 ** attempt)
+                    logger.warning(
+                        "Web search rate limited (attempt %d/%d) — retrying in %ds",
+                        attempt + 1, max_retries + 1, delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                elif status < 500:
+                    return []
             if attempt < max_retries:
                 logger.warning(
                     "Web search error (attempt %d/%d): %s — retrying in %ds",
