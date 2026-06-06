@@ -49,7 +49,7 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor, logout } = useAuth();
-  const { status: aiStatus, progress: aiProgress, startJob, setOnComplete, commentStatus, commentProgress, startCommentJob } = useAiJob();
+  const { setOnComplete } = useAiJob();
   const { registerHandlers } = useTranslation();
 
   useEffect(() => {
