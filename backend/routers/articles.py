@@ -179,8 +179,14 @@ async def create_article(
 @router.post("/ai-classify", response_model=AIClassifyResult)
 async def ai_classify_single(req: AIClassifyRequest, _: str = Depends(get_current_user)):
     """Classify a single article's title+body and return suggested categories/tags."""
-    result = await ai_classifier.classify(req.title, req.body)
-    return AIClassifyResult(**result)
+    logger.info("ai_classify_single start: title=%r", req.title[:50])
+    try:
+        result = await ai_classifier.classify(req.title, req.body)
+        logger.info("ai_classify_single done: %s", result)
+        return AIClassifyResult(**result)
+    except Exception as exc:
+        logger.exception("ai_classify_single failed: %s", exc)
+        raise
 
 
 @router.post("/ai-categorize", status_code=202)

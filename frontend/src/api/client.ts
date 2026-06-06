@@ -4,7 +4,12 @@ const BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { credentials: 'include', ...options });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    let body = '';
+    try { body = await res.text(); } catch { /* ignore */ }
+    console.error(`[API] ${options?.method ?? 'GET'} ${path} → ${res.status} ${res.statusText}`, body);
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
