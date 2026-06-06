@@ -71,7 +71,7 @@ export default function ArticlePage() {
     <article className="max-w-3xl mx-auto px-4 py-10">
       {/* Action buttons — fixed below header, top-right (editor only) */}
       {isEditor && (
-        <div className="fixed top-[72px] right-4 z-30 flex gap-2">
+        <div className="fixed top-[92px] sm:top-[72px] right-4 z-30 flex gap-2">
           <Link
             to={`/write?edit=${article.slug}`}
             className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold shadow-lg transition-colors whitespace-nowrap"
