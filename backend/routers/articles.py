@@ -107,7 +107,6 @@ async def create_article(
     categories: str = Form("[]"),
     tags: str = Form("[]"),
     published_at: Optional[str] = Form(None),
-    auto_classify: bool = Form(True),
     source_url: Optional[str] = Form(None),
     hero_image: Optional[UploadFile] = File(None),
     additional_images: list[UploadFile] = File(default=[]),
@@ -131,12 +130,6 @@ async def create_article(
             data = await img.read()
             rel = await storage.save_upload(slug, data, img.filename)
             extra_rels.append(rel)
-
-    if auto_classify and not cats:
-        result = await ai_classifier.classify(title, body)
-        cats = result.get("categories", [])
-        if not tag_list:
-            tag_list = result.get("tags", [])
 
     pub_dt = None
     if published_at:
@@ -178,10 +171,6 @@ async def create_article(
     await _fts_upsert(db, article)
     await db.commit()
     await db.refresh(article)
-
-    # Kick off background AI for any uncategorized/uncommented articles
-    await task_manager.start(SessionLocal, ai_classifier)
-    await task_manager.start_comment(SessionLocal, ai_commenter)
 
     return ArticleOut.model_validate(article)
 
