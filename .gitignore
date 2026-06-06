@@ -3,6 +3,7 @@ backend/.venv/
 
 # Imported article data — all article JSON + images live here (733+ articles, ~86 MB+)
 # Back this up separately; do NOT commit to git.
+backend/data
 backend/data/
 
 # Secrets
