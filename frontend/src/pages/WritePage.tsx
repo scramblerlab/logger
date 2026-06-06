@@ -182,7 +182,6 @@ export default function WritePage() {
         await api.articles.update(editSlug, form);
         navigate(`/articles/${editSlug}`);
       } else {
-        form.append('auto_classify', selectedCats.length === 0 ? 'true' : 'false');
         if (sourceUrl) form.append('source_url', sourceUrl);
         if (heroFile) form.append('hero_image', heroFile);
         for (const f of additionalFiles) form.append('additional_images', f);

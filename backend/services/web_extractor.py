@@ -135,6 +135,7 @@ def _extract_title(soup: BeautifulSoup) -> str:
     for sel in ["h1.entry-title", "h1.post-title", "article h1", "main h1", "h1"]:
         el = soup.select_one(sel)
         if el:
+            el["data-logger-title"] = "1"  # mark for direct removal later
             return el.get_text(strip=True)
     title_tag = soup.find("title")
     if title_tag:
@@ -164,6 +165,32 @@ def _extract_published_at(soup: BeautifulSoup) -> Optional[str]:
             if dt:
                 return str(dt)
     return None
+
+
+def _remove_extracted_from_content(content_el: Tag, title: str, hero_img_url: Optional[str]) -> None:
+    """Remove title h1 and hero img from body to avoid duplication with article fields."""
+    if title and title != "Untitled":
+        # Primary: decompose the element that was marked during title extraction
+        marked = content_el.find(attrs={"data-logger-title": "1"})
+        if marked:
+            marked.decompose()
+        else:
+            # Fallback for og:title case: og:title may be shorter than the h1 text.
+            # Remove the h1 if one is a prefix of the other (min 10 chars to avoid false positives).
+            for h1 in content_el.find_all("h1"):
+                h1_text = h1.get_text(strip=True)
+                shorter, longer = sorted([title, h1_text], key=len)
+                if len(shorter) >= 10 and longer.startswith(shorter):
+                    h1.decompose()
+                    break
+    if hero_img_url:
+        for img in content_el.find_all("img"):
+            if img.get("src") == hero_img_url:
+                parent = img.parent
+                img.decompose()
+                if parent and parent.name in ("figure", "p") and not parent.get_text(strip=True) and not parent.find_all():
+                    parent.decompose()
+                break
 
 
 def _resolve_lazy_images(content_el: Tag, base: str) -> list[str]:
@@ -215,12 +242,15 @@ async def extract_article(url: str) -> dict:
     _strip_global_noise(soup)
     content_el = _find_content_element(soup)
     img_urls = _resolve_lazy_images(content_el, base)
-    body_html = str(content_el)
 
     # Hero: og:image preferred, else first body image
     hero_img_url = og_hero_url or (img_urls[0] if img_urls else None)
     # All extra images (used for body rewriting); cap at 20 to avoid huge downloads
     extra_img_urls = [u for u in img_urls if u != hero_img_url][:20]
+
+    # Remove title h1 and hero img from body to avoid duplication
+    _remove_extracted_from_content(content_el, title, hero_img_url)
+    body_html = str(content_el)
 
     # Download hero
     hero_rel: Optional[str] = None

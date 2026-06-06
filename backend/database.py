@@ -91,6 +91,29 @@ async def init_db():
             """))
             await conn.execute(text("PRAGMA user_version = 3"))
 
+        if version < 4:
+            # Root-cause fix: FTS5 ignores INSERT OR REPLACE (treats it as plain INSERT),
+            # so both articles_ai trigger and _fts_upsert were each inserting a separate FTS row
+            # for the same rowid → duplicates → 'delete' command fails with SQL logic error.
+            # Fix: drop all triggers, rebuild FTS clean, recreate only articles_ad using plain DELETE.
+            for trig in ("articles_ai", "articles_au", "articles_ad"):
+                await conn.execute(text(f"DROP TRIGGER IF EXISTS {trig}"))
+            await conn.execute(text("DROP TABLE IF EXISTS articles_fts"))
+            await conn.execute(text("CREATE VIRTUAL TABLE articles_fts USING fts5(title, body)"))
+            from services.tokenizer import tokenize_ja as _tok
+            rows = (await conn.execute(text("SELECT rowid, title, body FROM articles"))).fetchall()
+            for row in rows:
+                await conn.execute(
+                    text("INSERT INTO articles_fts(rowid, title, body) VALUES (:rowid, :title, :body)"),
+                    {"rowid": row[0], "title": _tok(row[1] or ""), "body": _tok(row[2] or "")},
+                )
+            await conn.execute(text("""
+                CREATE TRIGGER articles_ad AFTER DELETE ON articles BEGIN
+                    DELETE FROM articles_fts WHERE rowid = old.rowid;
+                END
+            """))
+            await conn.execute(text("PRAGMA user_version = 4"))
+
     # Seed categories
     async with SessionLocal() as session:
         from sqlalchemy import select
