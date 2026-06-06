@@ -25,20 +25,24 @@ export const api = {
       request('/articles/ai-categorize', { method: 'POST' }),
     aiCategorizeStatus: (): Promise<{ status: string; progress: string; current_title: string; updated: number; total: number; failed: number }> =>
       request('/articles/ai-categorize/status'),
-    aiClassify: (title: string, body: string): Promise<{ categories: string[]; tags: string[] }> =>
+    aiClassify: (title: string, body: string): Promise<{ job_id: string }> =>
       request('/articles/ai-classify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, body }),
       }),
+    aiClassifyStatus: (jobId: string): Promise<{ status: string; result: { categories: string[]; tags: string[] } | null; error: string | null }> =>
+      request(`/articles/ai-classify/status/${jobId}`),
     bulkCategorize: (slugs: string[], add: string[], remove: string[]): Promise<{ updated: number }> =>
       request('/articles/bulk-categorize', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ article_slugs: slugs, add_categories: add, remove_categories: remove }),
       }),
-    aiComment: (slug: string): Promise<{ ai_comment: string; ai_comment_model: string }> =>
+    aiComment: (slug: string): Promise<{ job_id: string }> =>
       request(`/articles/${slug}/ai-comment`, { method: 'POST' }),
+    aiCommentStatus: (slug: string): Promise<{ status: string; result: { ai_comment: string; ai_comment_model: string } | null; error: string | null }> =>
+      request(`/articles/${slug}/ai-comment/status`),
     aiCommentBulk: (): Promise<{ started: boolean }> =>
       request('/articles/ai-comment-bulk', { method: 'POST' }),
     aiCommentBulkStatus: (): Promise<{ status: string; progress: string; current_title: string; updated: number; total: number; failed: number }> =>

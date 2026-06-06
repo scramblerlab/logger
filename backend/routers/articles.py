@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import uuid
@@ -14,8 +15,8 @@ from slugify import slugify
 from auth import get_current_user
 from database import get_db, SessionLocal
 from models import Article, Tag
-from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AIClassifyResult, AICommentResult, BulkCategorizeRequest
-from services import storage, ai_classifier, ai_commenter, task_manager
+from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, BulkCategorizeRequest
+from services import storage, ai_classifier, ai_commenter, task_manager, single_job
 from services.tokenizer import tokenize_ja
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
@@ -176,11 +177,26 @@ async def create_article(
     return ArticleOut.model_validate(article)
 
 
-@router.post("/ai-classify", response_model=AIClassifyResult)
-async def ai_classify_single(req: AIClassifyRequest, _: str = Depends(get_current_user)):
-    """Classify a single article's title+body and return suggested categories/tags."""
-    result = await ai_classifier.classify(req.title, req.body)
-    return AIClassifyResult(**result)
+@router.post("/ai-classify", status_code=202)
+async def ai_classify_start(req: AIClassifyRequest, _: str = Depends(get_current_user)):
+    """Start background AI classification. Poll /ai-classify/status/{job_id} for result."""
+    job_id = single_job.create()
+    asyncio.create_task(_run_classify(job_id, req.title, req.body))
+    return {"job_id": job_id}
+
+
+@router.get("/ai-classify/status/{job_id}")
+async def ai_classify_status(job_id: str):
+    return single_job.get(job_id)
+
+
+async def _run_classify(job_id: str, title: str, body: str) -> None:
+    try:
+        result = await ai_classifier.classify(title, body)
+        single_job.done(job_id, result)
+    except Exception as exc:
+        logger.exception("classify job %s failed", job_id)
+        single_job.fail(job_id, str(exc))
 
 
 @router.post("/ai-categorize", status_code=202)
@@ -220,27 +236,47 @@ async def bulk_categorize(
     return {"updated": len(articles)}
 
 
-@router.post("/{slug}/ai-comment", response_model=AICommentResult)
-async def ai_comment_single(
+@router.post("/{slug}/ai-comment", status_code=202)
+async def ai_comment_start(
     slug: str,
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
-    """Generate or refresh the AI comment for a single article."""
+    """Start background AI comment generation. Poll /{slug}/ai-comment/status for result."""
     result = await db.execute(select(Article).where(Article.slug == slug))
     article = result.scalar_one_or_none()
     if not article:
         raise HTTPException(404, "Article not found")
-    comment, comment_model = await ai_commenter.generate(article.title, article.body)
-    article.ai_comment = comment
-    article.ai_comment_model = comment_model
-    art_json = storage.read_article_json(slug)
-    if art_json:
-        art_json["ai_comment"] = comment
-        art_json["ai_comment_model"] = comment_model
-        storage.write_article_json(slug, art_json)
-    await db.commit()
-    return AICommentResult(ai_comment=comment, ai_comment_model=comment_model)
+    job_id = f"comment:{slug}"
+    single_job.create(key=job_id)
+    asyncio.create_task(_run_comment(job_id, slug, article.title, article.body))
+    return {"job_id": job_id}
+
+
+@router.get("/{slug}/ai-comment/status")
+async def ai_comment_status(slug: str):
+    return single_job.get(f"comment:{slug}")
+
+
+async def _run_comment(job_id: str, slug: str, title: str, body: str) -> None:
+    try:
+        comment, comment_model = await ai_commenter.generate(title, body)
+        async with SessionLocal() as db:
+            result = await db.execute(select(Article).where(Article.slug == slug))
+            article = result.scalar_one_or_none()
+            if article:
+                article.ai_comment = comment
+                article.ai_comment_model = comment_model
+                await db.commit()
+        art_json = storage.read_article_json(slug)
+        if art_json:
+            art_json["ai_comment"] = comment
+            art_json["ai_comment_model"] = comment_model
+            storage.write_article_json(slug, art_json)
+        single_job.done(job_id, {"ai_comment": comment, "ai_comment_model": comment_model})
+    except Exception as exc:
+        logger.exception("comment job %s failed", job_id)
+        single_job.fail(job_id, str(exc))
 
 
 @router.put("/{slug}", response_model=ArticleOut)
