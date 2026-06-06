@@ -36,8 +36,9 @@ async def _fts_upsert(db: AsyncSession, article: Article):
     rowid = (await db.execute(text("SELECT rowid FROM articles WHERE id = :id"), {"id": article.id})).scalar()
     if rowid is None:
         return
+    await db.execute(text("DELETE FROM articles_fts WHERE rowid = :rowid"), {"rowid": rowid})
     await db.execute(
-        text("INSERT OR REPLACE INTO articles_fts(rowid, title, body) VALUES (:rowid, :title, :body)"),
+        text("INSERT INTO articles_fts(rowid, title, body) VALUES (:rowid, :title, :body)"),
         {"rowid": rowid, "title": tokenize_ja(article.title or ""), "body": tokenize_ja(article.body or "")},
     )
 
