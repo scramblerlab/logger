@@ -33,7 +33,7 @@ export default function TranslateButton({ onSelect, translating, translated, onR
 
   if (translating) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-black bg-amber-500 px-2.5 py-1 rounded-full font-display tracking-wide whitespace-nowrap">
+      <div className="btn btn-solid flex items-center gap-1.5 font-display tracking-wide">
         <div className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin flex-shrink-0" />
         Translating...
       </div>
@@ -43,16 +43,11 @@ export default function TranslateButton({ onSelect, translating, translated, onR
   return (
     <div ref={ref} className="relative flex items-center gap-1.5">
       {translated && (
-        <button
-          onClick={onReset}
-          className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors whitespace-nowrap"
-        >
-          ↩ Reset
-        </button>
+        <button onClick={onReset} className="btn btn-outline">↩ Reset</button>
       )}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-display tracking-wide transition-colors whitespace-nowrap"
+        className="btn btn-solid font-display tracking-wide"
       >
         🌐 Translate
       </button>

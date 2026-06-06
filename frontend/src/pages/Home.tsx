@@ -218,56 +218,22 @@ export default function Home() {
     <div className={`max-w-7xl mx-auto px-4 py-8 ${bulkMode || exportMode ? 'pb-28' : ''}`}>
       {/* Mobile: action buttons (editor only) */}
       {isEditor && (
-        <div className="flex flex-wrap gap-2 mb-3 lg:hidden">
-          <button
-            onClick={startJob}
-            disabled={aiStatus === 'running'}
-            className="text-xs px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-50 transition-colors"
-          >
-            {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
-          </button>
-          <button
-            onClick={startCommentJob}
-            disabled={commentStatus === 'running'}
-            className="text-xs px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-50 transition-colors"
-          >
-            {commentStatus === 'running' ? '⏳ AIコメント中...' : 'AIコメント追加'}
-          </button>
+        <div className="flex gap-2 mb-3 lg:hidden">
           <button
             onClick={() => setShowCategoryEdit(true)}
-            className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
+            className="btn btn-outline"
           >
             カテゴリー編集
           </button>
-          <button
-            onClick={enterBulkMode}
-            className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
-          >
-            一括更新
-          </button>
-          <button
-            onClick={enterExportMode}
-            className="text-xs px-3 py-1.5 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
-          >
-            Shopify出力
-          </button>
-          {aiStatus !== 'idle' && aiProgress && (
-            <span className="text-xs text-amber-400 self-center">{aiProgress}</span>
-          )}
-          {commentStatus !== 'idle' && commentProgress && (
-            <span className="text-xs text-amber-400 self-center">{commentProgress}</span>
-          )}
         </div>
       )}
 
       {/* Mobile: category tabs + auth */}
       <div className="lg:hidden mb-6">
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => handleSelectCategory(null)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-              !activeCategory ? 'bg-amber-500 text-black' : 'bg-surface text-slate-400 border border-rim hover:bg-surface2'
-            }`}
+            className={`btn ${!activeCategory ? 'btn-solid' : 'btn-outline'}`}
           >
             {translatedLabels?.all ?? 'All'}
           </button>
@@ -275,30 +241,18 @@ export default function Home() {
             <button
               key={c.slug}
               onClick={() => handleSelectCategory(c.slug)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-                activeCategory === c.slug ? 'text-white' : 'bg-surface text-slate-400 border border-rim hover:bg-surface2'
-              }`}
+              className={`btn ${activeCategory === c.slug ? 'text-white' : 'btn-outline'}`}
               style={activeCategory === c.slug ? { backgroundColor: c.color } : {}}
             >
-              {translatedCategoryLabels?.get(c.slug) ?? c.name_ja}{c.article_count > 0 && <span className="ml-1 opacity-60 text-xs">{c.article_count}</span>}
+              {translatedCategoryLabels?.get(c.slug) ?? c.name_ja}{c.article_count > 0 && <span className="ml-1 opacity-60">{c.article_count}</span>}
             </button>
           ))}
         </div>
         <div className="mt-3 flex">
           {isEditor ? (
-            <button
-              onClick={() => logout()}
-              className="text-xs px-3 py-1.5 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors"
-            >
-              ログアウト
-            </button>
+            <button onClick={() => logout()} className="btn btn-solid">ログアウト</button>
           ) : (
-            <button
-              onClick={() => setShowLogin(true)}
-              className="text-xs px-3 py-1.5 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors"
-            >
-              ログイン
-            </button>
+            <button onClick={() => setShowLogin(true)} className="btn btn-solid">ログイン</button>
           )}
         </div>
       </div>
@@ -323,13 +277,13 @@ export default function Home() {
             <div className="flex items-center gap-1.5 mb-4">
               <button
                 onClick={() => handleSetSort('published')}
-                className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${sort === 'published' ? 'bg-amber-500 text-black' : 'bg-surface2 text-slate-400 border border-rim hover:bg-rim'}`}
+                className={`btn ${sort === 'published' ? 'btn-solid' : 'btn-outline'}`}
               >
                 新着順
               </button>
               <button
                 onClick={() => handleSetSort('imported')}
-                className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${sort === 'imported' ? 'bg-amber-500 text-black' : 'bg-surface2 text-slate-400 border border-rim hover:bg-rim'}`}
+                className={`btn ${sort === 'imported' ? 'btn-solid' : 'btn-outline'}`}
               >
                 インポート順
               </button>

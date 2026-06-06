@@ -297,7 +297,7 @@ export default function WritePage() {
           <div className="flex items-center gap-3 mb-2">
             <label className="text-sm font-medium text-slate-400">カテゴリー</label>
             <button type="button" onClick={handleAiClassify} disabled={classifying || !title}
-              className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40 transition-colors whitespace-nowrap"
+              className="btn btn-solid disabled:opacity-40"
             >
               {classifying ? '⏳ AI分析中...' : '✦ AI分析'}
             </button>
@@ -311,7 +311,7 @@ export default function WritePage() {
             <div className="mb-2 space-y-2">
               <div className="flex items-center gap-3">
                 <button type="button" onClick={handleAiComment} disabled={commenting}
-                  className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold disabled:opacity-40 transition-colors whitespace-nowrap"
+                  className="btn btn-solid disabled:opacity-40"
                 >
                   {commenting ? '⏳ 生成中...' : '✦ AIコメント追加/変更'}
                 </button>
@@ -332,10 +332,10 @@ export default function WritePage() {
           <div className="flex flex-wrap gap-2">
             {categories.map((cat) => (
               <button key={cat.slug} type="button" onClick={() => toggleCat(cat.slug)}
-                className={`text-xs px-2.5 py-1 rounded-full font-semibold border transition-colors whitespace-nowrap ${
+                className={`btn ${
                   selectedCats.includes(cat.slug)
-                    ? 'text-white border-transparent'
-                    : 'border-rim text-slate-400 hover:bg-surface2 hover:text-slate-100'
+                    ? 'text-white border-transparent border'
+                    : 'btn-outline'
                 }`}
                 style={selectedCats.includes(cat.slug) ? { backgroundColor: cat.color, borderColor: cat.color } : {}}
               >
@@ -353,9 +353,7 @@ export default function WritePage() {
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
               placeholder="タグを入力 → Enter" className={inputCls}
             />
-            <button type="button" onClick={addTag}
-              className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim text-slate-300 font-semibold border border-rim transition-colors whitespace-nowrap"
-            >追加</button>
+            <button type="button" onClick={addTag} className="btn btn-outline">追加</button>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (
@@ -375,7 +373,7 @@ export default function WritePage() {
             {submitting ? '投稿中...' : editSlug ? '更新する' : '投稿する'}
           </button>
           <button type="button" onClick={() => navigate(-1)}
-            className="text-xs px-4 py-2 rounded-full bg-surface2 hover:bg-rim text-slate-300 font-semibold border border-rim transition-colors whitespace-nowrap"
+            className="text-xs px-4 py-2 rounded-full btn-outline font-semibold whitespace-nowrap"
           >
             キャンセル
           </button>

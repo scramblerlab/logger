@@ -75,16 +75,10 @@ export default function Header({ onSearch }: Props) {
             )}
             {isEditor && (
               <>
-                <button
-                  onClick={() => setShowExtract(true)}
-                  className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
-                >
+                <button onClick={() => setShowExtract(true)} className="btn btn-solid">
                   Web記事抽出
                 </button>
-                <Link
-                  to="/write"
-                  className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
-                >
+                <Link to="/write" className="btn btn-solid">
                   + 投稿 / Write
                 </Link>
               </>
@@ -102,18 +96,8 @@ export default function Header({ onSearch }: Props) {
           />
           {isEditor && (
             <>
-              <button
-                onClick={() => setShowExtract(true)}
-                className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
-              >
-                抽出
-              </button>
-              <Link
-                to="/write"
-                className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors whitespace-nowrap"
-              >
-                投稿
-              </Link>
+              <button onClick={() => setShowExtract(true)} className="btn btn-solid">抽出</button>
+              <Link to="/write" className="btn btn-solid">投稿</Link>
             </>
           )}
         </div>
