@@ -17,7 +17,7 @@ function AppInner() {
   };
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen bg-canvas overflow-x-hidden">
       <Header onSearch={handleSearch} />
       <Suspense fallback={null}>
         <Routes>
