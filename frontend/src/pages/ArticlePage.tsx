@@ -72,15 +72,12 @@ export default function ArticlePage() {
       {/* Action buttons — fixed below header, top-right (editor only) */}
       {isEditor && (
         <div className="fixed top-[92px] sm:top-[72px] right-4 z-30 flex gap-2">
-          <Link
-            to={`/write?edit=${article.slug}`}
-            className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-black font-semibold shadow-lg transition-colors whitespace-nowrap"
-          >
+          <Link to={`/write?edit=${article.slug}`} className="btn btn-solid shadow-lg">
             編集
           </Link>
           <button
             onClick={handleDelete}
-            className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-red-600 border border-rim hover:border-red-600 text-slate-300 hover:text-white font-semibold shadow-lg transition-colors whitespace-nowrap"
+            className="btn btn-outline hover:bg-red-600 hover:border-red-600 hover:text-white shadow-lg"
           >
             削除
           </button>

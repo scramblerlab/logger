@@ -40,24 +40,12 @@ export default function Sidebar({
                 onClick={startJob}
                 disabled={aiStatus === 'running'}
                 title="AI カテゴライズ"
-                className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold transition-colors whitespace-nowrap"
+                className="btn btn-solid disabled:opacity-50"
               >
                 {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
               </button>
-              <button
-                onClick={onOpenCategoryEdit}
-                title="カテゴリーを編集"
-                className="text-xs px-2.5 py-1 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
-              >
-                編集
-              </button>
-              <button
-                onClick={onBulkCategorize}
-                title="カテゴリー一括更新"
-                className="text-xs px-2.5 py-1 rounded-lg bg-surface2 hover:bg-rim border border-rim text-slate-300 font-medium transition-colors"
-              >
-                一括更新
-              </button>
+              <button onClick={onOpenCategoryEdit} title="カテゴリーを編集" className="btn btn-outline">編集</button>
+              <button onClick={onBulkCategorize} title="カテゴリー一括更新" className="btn btn-outline">一括更新</button>
             </div>
           )}
         </div>
@@ -72,7 +60,7 @@ export default function Sidebar({
               onClick={startCommentJob}
               disabled={commentStatus === 'running'}
               title="AIコメント一括追加"
-              className="text-xs px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold transition-colors whitespace-nowrap"
+              className="btn btn-solid disabled:opacity-50"
             >
               {commentStatus === 'running' ? '⏳ AIコメント中...' : 'AIコメント追加'}
             </button>
@@ -168,19 +156,9 @@ export default function Sidebar({
       )}
       <div className="pt-4 border-t border-rim">
         {isEditor ? (
-          <button
-            onClick={() => logout()}
-            className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors"
-          >
-            ログアウト
-          </button>
+          <button onClick={() => logout()} className="btn btn-solid">ログアウト</button>
         ) : (
-          <button
-            onClick={() => setShowLogin(true)}
-            className="text-xs px-2.5 py-1 rounded-full bg-surface2 hover:bg-rim border border-rim text-slate-300 font-semibold transition-colors"
-          >
-            ログイン
-          </button>
+          <button onClick={() => setShowLogin(true)} className="btn btn-solid">ログイン</button>
         )}
       </div>
     </aside>

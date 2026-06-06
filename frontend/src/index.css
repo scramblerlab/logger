@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* Base button — matches the top-menu Translate button size */
+  .btn {
+    @apply text-xs px-2.5 py-1 rounded-full font-semibold transition-colors whitespace-nowrap;
+  }
+  .btn-solid {
+    @apply bg-amber-500 hover:bg-amber-400 text-black;
+  }
+  .btn-outline {
+    @apply border border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-black;
+  }
+}
+
 body {
   @apply bg-canvas text-slate-100;
   font-family: 'Space Grotesk', 'Noto Sans JP', sans-serif;
