@@ -49,6 +49,7 @@ async def chat(
                     "Ollama chat error (attempt %d/%d): %s — retrying in %ds",
                     attempt + 1, max_retries + 1, exc, wait,
                 )
+                await asyncio.sleep(wait)
 
     raise last_exc  # type: ignore[misc]
 

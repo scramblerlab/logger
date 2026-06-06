@@ -143,7 +143,7 @@ export default function WritePage() {
       } else {
         setClassifyMsg('カテゴリーを判定できませんでした');
       }
-    } catch { setClassifyMsg('エラーが発生しました'); }
+    } catch (e) { console.error('AI classify error:', e); setClassifyMsg('エラーが発生しました'); }
     finally { setClassifying(false); }
   };
 
