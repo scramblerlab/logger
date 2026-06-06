@@ -383,6 +383,24 @@ async def update_article(
     return ArticleOut.model_validate(article)
 
 
+@router.post("/{slug}/images", status_code=201)
+async def upload_article_image(
+    slug: str,
+    image: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    result = await db.execute(select(Article).where(Article.slug == slug))
+    if not result.scalar_one_or_none():
+        raise HTTPException(404, "Article not found")
+    data = await image.read()
+    rel = await storage.save_upload(slug, data, image.filename or "image.jpg")
+    art_json = storage.read_article_json(slug) or {}
+    art_json.setdefault("additionalImages", []).append(rel)
+    storage.write_article_json(slug, art_json)
+    return {"rel_path": rel}
+
+
 @router.delete("/{slug}", status_code=204)
 async def delete_article(slug: str, db: AsyncSession = Depends(get_db), _: str = Depends(get_current_user)):
     result = await db.execute(select(Article).where(Article.slug == slug))

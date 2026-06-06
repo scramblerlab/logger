@@ -42,6 +42,8 @@ export default function WritePage() {
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
   const [heroFromExisting, setHeroFromExisting] = useState<string | null>(null);
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
+  const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
+  const [uploadedRels, setUploadedRels] = useState<(string | null)[]>([]);
   const [existingAdditional, setExistingAdditional] = useState<string[]>([]);
   const [removedImages, setRemovedImages] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -180,6 +182,23 @@ export default function WritePage() {
     setExistingAdditional((p) => p.filter((x) => x !== rel));
   };
 
+  const insertImageMarkdown = (relPath: string) => {
+    setBody((prev) => prev ? `${prev}\n\n![](${relPath})` : `![](${relPath})`);
+  };
+
+  const uploadImageNow = async (file: File): Promise<string | null> => {
+    if (!editSlug) return null;
+    const form = new FormData();
+    form.append('image', file);
+    try {
+      const res = await fetch(`/api/articles/${editSlug}/images`, {
+        method: 'POST', body: form, credentials: 'include',
+      });
+      if (!res.ok) return null;
+      return (await res.json()).rel_path as string;
+    } catch { return null; }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -276,20 +295,25 @@ export default function WritePage() {
         {/* Existing additional images (edit mode) */}
         {editSlug && existingAdditional.length > 0 && (
           <div>
-            <label className={labelCls}>現在の追加画像 <span className="text-xs text-slate-600 font-normal">（ヒーロー画像エリアにドラッグしてセット可）</span></label>
+            <label className={labelCls}>現在の追加画像 <span className="text-xs text-slate-600 font-normal">（クリックで本文に挿入 / ヒーロー画像エリアにドラッグでセット可）</span></label>
             <div className="flex flex-wrap gap-3">
               {existingAdditional.map((rel) => (
                 <div
                   key={rel}
-                  className="relative group w-24 h-24 cursor-grab active:cursor-grabbing"
+                  className="relative group w-24 h-24 cursor-pointer"
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData('text/plain', rel);
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
+                  onClick={() => insertImageMarkdown(rel)}
+                  title="クリックして本文に挿入"
                 >
                   <img src={`/static/articles/${editSlug}/${rel}`} alt="" className="w-24 h-24 object-cover rounded-lg ring-1 ring-rim select-none" />
-                  <button type="button" onClick={() => removeExistingImage(rel)}
+                  <span className="absolute inset-x-0 bottom-0 bg-amber-500/80 text-black text-xs text-center py-0.5 rounded-b-lg select-none pointer-events-none opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    挿入
+                  </span>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); removeExistingImage(rel); }}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-600 text-white rounded-full text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                   >×</button>
                 </div>
@@ -302,10 +326,45 @@ export default function WritePage() {
         <div>
           <label className={labelCls}>{editSlug ? '追加画像を追加' : '追加画像'}</label>
           <input type="file" accept="image/*" multiple
-            onChange={(e) => setAdditionalFiles(Array.from(e.target.files ?? []))}
+            onChange={async (e) => {
+              const files = Array.from(e.target.files ?? []);
+              setAdditionalFiles(files);
+              setAdditionalPreviews(files.map((f) => URL.createObjectURL(f)));
+              setUploadedRels(new Array(files.length).fill(null));
+              if (editSlug) {
+                const rels = await Promise.all(files.map((f) => uploadImageNow(f)));
+                setUploadedRels(rels);
+                const succeeded = rels.filter(Boolean) as string[];
+                if (succeeded.length > 0)
+                  setExistingAdditional((prev) => [...prev, ...succeeded]);
+              }
+            }}
             className="text-xs text-slate-400 file:mr-3 file:text-xs file:font-semibold file:bg-amber-500 file:text-black file:border-0 file:px-2.5 file:py-1 file:rounded-full hover:file:bg-amber-400 file:transition-colors"
           />
-          {additionalFiles.length > 0 && <p className="text-xs text-slate-500 mt-1">{additionalFiles.length}件選択済み</p>}
+          {additionalPreviews.length > 0 && (
+            <div className="flex flex-wrap gap-3 mt-3">
+              {additionalPreviews.map((src, i) => {
+                const rel = uploadedRels[i];
+                const canInsert = !!editSlug && !!rel;
+                return (
+                  <div key={i} className="relative group w-24 h-24">
+                    <img src={src} alt="" className="w-24 h-24 object-cover rounded-lg ring-1 ring-rim select-none" />
+                    <button
+                      type="button"
+                      disabled={!canInsert}
+                      onClick={() => canInsert && insertImageMarkdown(rel!)}
+                      className={`absolute inset-x-0 bottom-0 rounded-b-lg text-xs text-center py-0.5 font-semibold transition-opacity
+                        ${canInsert
+                          ? 'bg-amber-500/80 text-black opacity-100 md:opacity-0 md:group-hover:opacity-100 active:opacity-100'
+                          : 'bg-black/40 text-slate-400 opacity-100'}`}
+                    >
+                      {rel ? '挿入' : editSlug ? '…' : '–'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Categories */}
