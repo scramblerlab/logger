@@ -37,7 +37,7 @@ export default function ArticleCard({ article, categories, selectable, selected,
   );
 
   const content = (
-    <div className={`p-4 ${featured ? 'flex flex-col justify-center flex-1 min-w-0' : ''}`}>
+    <div className={`p-4 ${featured ? 'flex flex-col justify-center flex-1 min-w-0' : 'flex flex-col justify-center flex-1 min-w-0 sm:block'}`}>
       <div className="flex flex-wrap gap-1 mb-2">
         {cats.map((c) => (
           <span key={c.slug} className="text-xs font-medium px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: c.color }}>
@@ -69,7 +69,7 @@ export default function ArticleCard({ article, categories, selectable, selected,
     </>
   ) : (
     <>
-      <div className="relative aspect-video bg-surface2 overflow-hidden">
+      <div className="relative w-2/5 flex-shrink-0 sm:w-full sm:aspect-video bg-surface2 overflow-hidden">
         {imgUrl ? (
           <img src={imgUrl} alt={article.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : placeholder}
@@ -79,7 +79,7 @@ export default function ArticleCard({ article, categories, selectable, selected,
     </>
   );
 
-  const baseClass = `group bg-surface rounded-xl overflow-hidden ring-1 ring-rim hover:ring-amber-500/50 transition-all duration-200 ${featured ? 'flex flex-row' : 'block'}`;
+  const baseClass = `group bg-surface rounded-xl overflow-hidden ring-1 ring-rim hover:ring-amber-500/50 transition-all duration-200 ${featured ? 'flex flex-row' : 'flex flex-row sm:block'}`;
 
   if (selectable) {
     return (
