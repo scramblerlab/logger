@@ -135,6 +135,7 @@ def _extract_title(soup: BeautifulSoup) -> str:
     for sel in ["h1.entry-title", "h1.post-title", "article h1", "main h1", "h1"]:
         el = soup.select_one(sel)
         if el:
+            el["data-logger-title"] = "1"  # mark for direct removal later
             return el.get_text(strip=True)
     title_tag = soup.find("title")
     if title_tag:
@@ -169,10 +170,19 @@ def _extract_published_at(soup: BeautifulSoup) -> Optional[str]:
 def _remove_extracted_from_content(content_el: Tag, title: str, hero_img_url: Optional[str]) -> None:
     """Remove title h1 and hero img from body to avoid duplication with article fields."""
     if title and title != "Untitled":
-        for h1 in content_el.find_all("h1"):
-            if h1.get_text(strip=True) == title:
-                h1.decompose()
-                break
+        # Primary: decompose the element that was marked during title extraction
+        marked = content_el.find(attrs={"data-logger-title": "1"})
+        if marked:
+            marked.decompose()
+        else:
+            # Fallback for og:title case: og:title may be shorter than the h1 text.
+            # Remove the h1 if one is a prefix of the other (min 10 chars to avoid false positives).
+            for h1 in content_el.find_all("h1"):
+                h1_text = h1.get_text(strip=True)
+                shorter, longer = sorted([title, h1_text], key=len)
+                if len(shorter) >= 10 and longer.startswith(shorter):
+                    h1.decompose()
+                    break
     if hero_img_url:
         for img in content_el.find_all("img"):
             if img.get("src") == hero_img_url:
