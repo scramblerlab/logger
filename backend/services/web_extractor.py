@@ -166,6 +166,23 @@ def _extract_published_at(soup: BeautifulSoup) -> Optional[str]:
     return None
 
 
+def _remove_extracted_from_content(content_el: Tag, title: str, hero_img_url: Optional[str]) -> None:
+    """Remove title h1 and hero img from body to avoid duplication with article fields."""
+    if title and title != "Untitled":
+        for h1 in content_el.find_all("h1"):
+            if h1.get_text(strip=True) == title:
+                h1.decompose()
+                break
+    if hero_img_url:
+        for img in content_el.find_all("img"):
+            if img.get("src") == hero_img_url:
+                parent = img.parent
+                img.decompose()
+                if parent and parent.name in ("figure", "p") and not parent.get_text(strip=True) and not parent.find_all():
+                    parent.decompose()
+                break
+
+
 def _resolve_lazy_images(content_el: Tag, base: str) -> list[str]:
     """
     Collect real image URLs from a content element.
@@ -215,12 +232,15 @@ async def extract_article(url: str) -> dict:
     _strip_global_noise(soup)
     content_el = _find_content_element(soup)
     img_urls = _resolve_lazy_images(content_el, base)
-    body_html = str(content_el)
 
     # Hero: og:image preferred, else first body image
     hero_img_url = og_hero_url or (img_urls[0] if img_urls else None)
     # All extra images (used for body rewriting); cap at 20 to avoid huge downloads
     extra_img_urls = [u for u in img_urls if u != hero_img_url][:20]
+
+    # Remove title h1 and hero img from body to avoid duplication
+    _remove_extracted_from_content(content_el, title, hero_img_url)
+    body_html = str(content_el)
 
     # Download hero
     hero_rel: Optional[str] = None
