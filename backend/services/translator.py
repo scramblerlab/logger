@@ -5,8 +5,14 @@ from services import ollama_client
 logger = logging.getLogger(__name__)
 
 
+def _strip_thinking(text: str) -> str:
+    """Remove <think>…</think> blocks emitted by reasoning models (e.g. Qwen3)."""
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+
 def _extract_tag(text: str, tag: str, fallback: str) -> str:
-    matches = re.findall(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
+    clean = _strip_thinking(text)
+    matches = re.findall(rf"<{tag}>(.*?)</{tag}>", clean, re.DOTALL)
     if not matches:
         return fallback
     return " ".join(m.strip() for m in matches)
@@ -30,6 +36,7 @@ async def translate_article(
         response = await ollama_client.chat(
             [{"role": "user", "content": prompt}],
             options={"num_ctx": 8192},
+            think=False,
         )
         translated_title = _extract_tag(response, "title", title)
         translated_body = _extract_tag(response, "body", body)
@@ -59,6 +66,7 @@ async def translate_titles(titles: list[str], target_language: str) -> list[str]
         response = await ollama_client.chat(
             [{"role": "user", "content": prompt}],
             options={"num_ctx": 4096},
+            think=False,
         )
         result: list[str] = []
         for i, original in enumerate(titles):

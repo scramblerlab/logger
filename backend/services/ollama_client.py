@@ -20,6 +20,7 @@ async def chat(
     messages: list[dict],
     *,
     options: dict | None = None,
+    think: bool | None = None,
     max_retries: int = 3,
     wait: int = 30,
 ) -> str:
@@ -28,6 +29,8 @@ async def chat(
     payload: dict = {"model": model, "messages": messages, "stream": False}
     if options:
         payload["options"] = options
+    if think is not None:
+        payload["think"] = think
 
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
