@@ -9,26 +9,20 @@ pkill -f "uvicorn main:app" 2>/dev/null && echo "Stopped existing backend." || t
 pkill -f "vite" 2>/dev/null && echo "Stopped existing frontend." || true
 sleep 1
 
-# --- Ollama ---
-OLLAMA_MODEL=$(grep -E '^OLLAMA_MODEL=' "$PROJECT_DIR/backend/.env" 2>/dev/null | cut -d= -f2)
-OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3.5:4b}"
+# --- aimodel proxy check ---
+# Ollama is managed by aimodel — this app connects through the proxy on :11431.
 OLLAMA_BASE_URL=$(grep -E '^OLLAMA_BASE_URL=' "$PROJECT_DIR/backend/.env" 2>/dev/null | cut -d= -f2)
-OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
+OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11431}"
+OLLAMA_PID=""
 
-if ! curl -s "${OLLAMA_BASE_URL}/api/tags" &>/dev/null; then
-  echo "Starting Ollama..."
-  ollama serve &>/tmp/ollama.log &
-  OLLAMA_PID=$!
-  sleep 2
-else
-  OLLAMA_PID=""
-fi
-
-if ! ollama list 2>/dev/null | grep -q "^${OLLAMA_MODEL}"; then
-  echo "Model ${OLLAMA_MODEL} not found. Run: ollama pull ${OLLAMA_MODEL}"
+if ! curl -s "${OLLAMA_BASE_URL}/health" &>/dev/null; then
+  echo ""
+  echo "  ERROR: aimodel proxy not running on ${OLLAMA_BASE_URL}."
+  echo "  Start it first:  cd $(dirname "$PROJECT_DIR")/aimodel && ./start.sh"
+  echo ""
   exit 1
 fi
-echo "Ollama ready (model: ${OLLAMA_MODEL})"
+echo "aimodel proxy ready (${OLLAMA_BASE_URL})"
 
 # --- Backend ---
 echo "Starting backend on port 8000..."
@@ -51,5 +45,5 @@ echo "  API docs: http://localhost:8000/docs"
 echo ""
 echo "Press Ctrl+C to stop."
 
-trap "kill $BACKEND_PID $FRONTEND_PID ${OLLAMA_PID:-} 2>/dev/null; exit" SIGINT SIGTERM
+trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit" SIGINT SIGTERM
 wait
