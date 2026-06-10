@@ -58,7 +58,13 @@ async def get_current_user(request: Request) -> str:
     return verify_token(token)
 
 
+import logging as _logging
+_log = _logging.getLogger(__name__)
+
 async def verify_shared_token(request: Request) -> None:
+    _log.info("shared-storage origin: %s | referer: %s",
+              request.headers.get("origin", "(none)"),
+              request.headers.get("referer", "(none)"))
     if not _SECRET:
         raise HTTPException(500, "JWT_SECRET not configured")
     if not _SHARED_STORAGE_TOKEN:

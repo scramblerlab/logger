@@ -48,6 +48,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def _log_shared_origin(request, call_next):
+    if request.url.path.startswith("/api/shared"):
+        logging.getLogger("cors_debug").info(
+            "method=%s origin=%s",
+            request.method,
+            request.headers.get("origin", "(none)"),
+        )
+    return await call_next(request)
+
 articles_static = os.path.join(DATA_DIR, "articles")
 os.makedirs(articles_static, exist_ok=True)
 app.mount("/static/articles", StaticFiles(directory=articles_static), name="static_articles")
