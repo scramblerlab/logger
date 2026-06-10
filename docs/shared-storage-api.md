@@ -42,6 +42,22 @@ The token is static — it doesn't expire and never changes unless you regenerat
 
 ---
 
+## CORS
+
+Browser-based callers require their origin to be listed in `CORS_ORIGINS` in `backend/.env`. Server-side callers (scripts, AI agents) are not subject to CORS and need no changes.
+
+**Currently allowed origins** (keep `.env.example` in sync when adding new ones):
+
+| Origin | App |
+|---|---|
+| `http://localhost:5173` | Local Vite dev server |
+| `http://localhost:3000` | Local dev (alt port) |
+| `https://extensions.shopifycdn.com` | Shopify storefront extension |
+
+To add a new origin: append it to `CORS_ORIGINS` in `backend/.env` (comma-separated) and restart the server. No code change needed. The server logs the `Origin` of every `/api/shared/` request at `INFO` level (`cors_debug` logger), so you can identify new callers before adding them.
+
+---
+
 ## Authentication
 
 Every request must include the token in the `Authorization` header:
