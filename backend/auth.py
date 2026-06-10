@@ -10,6 +10,7 @@ from jose import JWTError, jwt
 _SECRET = os.getenv("JWT_SECRET", "")
 _EXPIRE_DAYS = int(os.getenv("JWT_EXPIRE_DAYS", "30"))
 _EDITORS_PATH = Path(__file__).parent / "editors.json"
+_SHARED_STORAGE_TOKEN = os.getenv("SHARED_STORAGE_TOKEN", "")
 
 
 def _load_editors() -> dict[str, str]:
@@ -55,3 +56,25 @@ async def get_current_user(request: Request) -> str:
     if not token:
         raise HTTPException(401, "Not authenticated")
     return verify_token(token)
+
+
+async def verify_shared_token(request: Request) -> None:
+    if not _SECRET:
+        raise HTTPException(500, "JWT_SECRET not configured")
+    if not _SHARED_STORAGE_TOKEN:
+        raise HTTPException(500, "SHARED_STORAGE_TOKEN not configured")
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization: Bearer <token> header required")
+    token = auth.removeprefix("Bearer ")
+    if not hmac.compare_digest(token, _SHARED_STORAGE_TOKEN):
+        raise HTTPException(401, "Invalid shared storage token")
+    try:
+        payload = jwt.decode(token, _SECRET, algorithms=["HS256"],
+                             options={"verify_exp": False})
+        if payload.get("type") != "shared_storage":
+            raise HTTPException(401, "Invalid token type claim")
+        if payload.get("iss") != "scrambler-lab":
+            raise HTTPException(401, "Invalid token issuer claim")
+    except JWTError:
+        raise HTTPException(401, "Invalid token signature")

@@ -19,15 +19,17 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from database import init_db, DATA_DIR
-from routers import articles, categories, search, importer, auth, ai_chat, translate, extract
+from routers import articles, categories, search, importer, auth, ai_chat, translate, extract, shared_storage
 from routers import shopify_importer
 from routers.auth import limiter
 from services import task_manager
+from services.shared_storage_service import ensure_shared_dir
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await ensure_shared_dir()
     yield
     await task_manager.cancel()
     await task_manager.cancel_comment()
@@ -59,6 +61,7 @@ app.include_router(shopify_importer.router)
 app.include_router(ai_chat.router)
 app.include_router(translate.router)
 app.include_router(extract.router)
+app.include_router(shared_storage.router)
 
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
