@@ -48,7 +48,8 @@ async def generate(title: str, body: str) -> tuple[str, str]:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
-        options={"num_ctx": 4096, "think": False},
+        options={"num_ctx": 4096},
+        think=False,  # top-level field — Ollama ignores "think" inside options
     )
 
     if not comment.strip():
