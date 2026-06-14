@@ -8,7 +8,7 @@ A self-hosted, AI-powered lifestyle blog app. Consolidates content from six Word
 
 | Feature | Details |
 |---|---|
-| **Post articles** | Web UI with Markdown editor, hero image drag-and-drop, bilingual title (EN/JA) |
+| **Post articles** | Mobile-first block editor (paragraph, heading, list, quote, code, image, video); hero image drag-and-drop |
 | **Web article extraction** | Paste any URL → title, body (Markdown), and images auto-fill the editor; source URL recorded |
 | **AI tagging** | Per-article "✦ AI分析" button — local Ollama model auto-assigns categories and tags |
 | **AI comment** | One-click AI-generated commentary per article; bulk generation from the sidebar |
@@ -100,7 +100,21 @@ logger/
 │   │   │   ├── CategoryEditModal.tsx # Add/delete categories
 │   │   │   ├── LoginModal.tsx        # Editor login dialog
 │   │   │   ├── ShopifyExportDialog.tsx  # Shopify credentials + blog select modal
-│   │   │   └── ShopifyExportPanel.tsx   # Fixed bottom bar for Shopify export
+│   │   │   ├── ShopifyExportPanel.tsx   # Fixed bottom bar for Shopify export
+│   │   │   ├── BlockEditor.tsx       # Block list state, insert/delete/reorder, image upload
+│   │   │   ├── BlockToolbar.tsx      # Floating toolbar above keyboard (36px, visualViewport)
+│   │   │   ├── BlockInserter.tsx     # "+" bottom sheet: 7 block type buttons
+│   │   │   ├── PostResultBanner.tsx  # Save result sheet: URL, page size, block count
+│   │   │   └── blocks/
+│   │   │       ├── ParagraphBlock.tsx   # Auto-resize textarea
+│   │   │       ├── HeadingBlock.tsx     # H2/H3/H4 single-line input
+│   │   │       ├── ListBlock.tsx        # Per-item inputs; Enter/Backspace management
+│   │   │       ├── QuoteBlock.tsx       # Content + attribution textareas
+│   │   │       ├── CodeBlock.tsx        # Monospace textarea + language label
+│   │   │       ├── ImageBlock.tsx       # File pick + preview + caption + rotation
+│   │   │       └── VideoBlock.tsx       # File upload or YouTube/Vimeo URL embed
+│   │   ├── utils/
+│   │   │   └── blocks.ts             # Block types, createBlock, moveBlock, parseMarkdown, serializeBlocks
 │   │   ├── context/
 │   │   │   ├── AuthContext.tsx       # Editor auth state + login/logout
 │   │   │   ├── AiJobContext.tsx      # Background AI job polling + status
@@ -113,6 +127,7 @@ logger/
 │   ├── config.yml           # cloudflared tunnel config (fill in TUNNEL_ID)
 │   └── setup.md             # Step-by-step CloudFlare tunnel setup guide
 ├── docs/
+│   ├── block-editor-proposal.md  # Block editor design proposal + ASCII mockups + verification plan
 │   ├── web-article-extraction.md # Web scraping: lazy-image handling, extractor design
 │   ├── wordpress-import.md       # WordPress bulk import implementation notes
 │   ├── shopify-import-export.md  # Shopify feature design notes
@@ -322,6 +337,63 @@ Click **AI分類** to run classification on every article that has no category a
 
 **Post-import (automatic):**
 Both WordPress and Shopify importers automatically trigger a background AI classification pass after import completes.
+
+---
+
+## ブロックエディター (記事編集)
+
+記事の新規作成・編集はiPhone Airに最適化されたモバイルファーストのブロックエディターで行う。生のMarkdownを書く代わりに、ブロックを組み合わせて記事を構成する。
+
+### ブロックタイプ
+
+| ブロック | 説明 |
+|---|---|
+| 段落 (¶) | 標準テキスト。**太字** / _斜体_ / リンクをツールバーから挿入 |
+| 見出し (H) | H2 / H3 の2レベル。ツールバーで切り替え |
+| リスト (≡) | 箇条書き・番号付きリスト。Enterで項目追加、空行でBackspace削除 |
+| 引用 (") | ブロッククォート + 任意の出典行 |
+| コード (</>) | 言語ラベル付きコードブロック。Tabキーでインデント挿入 |
+| 画像 (🖼) | カメラロールから選択・撮影。キャプション付き |
+| 動画 (▶) | ファイルアップロードまたはYouTube / VimeoのURL埋め込み |
+
+### エディター操作
+
+**ブロック追加:** ブロック間の `+` ボタン、または末尾の「＋ ブロックを追加」からブロックピッカー（ボトムシート）を開く。
+
+**フローティングツールバー:** ブロック選択時にキーボード上部に常駐する36px高のツールバーが表示される。
+
+```
+[ B  I  🔗 ] | [ H2  H3 ] | [ 1.  •  🖼  ↻ ] | [ ↑  ↓  ⇅  n/N  ✕ ]
+```
+
+- `B / I / 🔗` — 選択テキストへのインライン書式（太字 / 斜体 / リンク）
+- `H2 / H3` — 段落を見出しに変換、またはレベル切り替え（画像ブロック選択時は非表示）
+- `1. / •` — リスト変換（番号付き / 箇条書き）
+- `🖼` — 現在のブロックの直下に画像ブロックを挿入（キーボードを閉じずに写真追加可能）
+- `↻` — 画像を時計回り90°回転（画像ブロック選択時のみ表示）
+- `↑ / ↓` — ブロックを1つ上/下に移動
+- `⇅` — 並び替えモード切り替え（詳細は下記）
+- `n/N` — 現在ブロックの位置表示（例: `2/8`）
+- `✕` — ブロック削除
+
+**並び替えモード (`⇅`):**
+タップで並び替えモードへ切り替え。各ブロックをタップして選択 → 左端に表示されるハンドル（⠿）を長押し（400ms）してドラッグ。↑/↓ による1ステップ移動も常時使用可能。
+
+**画像の向き修正:**
+- ブロック画像 — ツールバーの `↻` で回転。保存時に回転をピクセルに焼き込んで再アップロードするため、記事ページでも正しい向きで表示される。
+- ヒーロー画像 — プレビュー左上の `↻` ボタンで回転。同様に保存時に焼き込み。
+
+**保存フィードバック:**
+更新ボタンが進捗メッセージをリアルタイム表示する（例: `画像を回転処理中 (2/4)...` → `記事を保存中...`）。保存完了後はURL・ページサイズ（KB）・ブロック数を含む結果バナーが表示される。
+
+### ストレージ設計
+
+ブロックエディターはMarkdownを正規フォーマットとして維持する。
+
+- **ロード時:** `article.body`（Markdown）→ `remark-parse` でAST → `Block[]` に変換
+- **保存時:** `Block[]` → Markdownにシリアライズ → 既存の `/api/articles/{slug}` エンドポイントにPUT
+
+バックエンドスキーマ変更なし。`ArticlePage` の `react-markdown` 表示はそのまま動作し続ける。
 
 ---
 
