@@ -134,12 +134,22 @@ export default function ArticlePage() {
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            img: ({ src, alt }) => {
+            img: ({ src, alt, title }) => {
               const fullSrc =
                 src?.startsWith('http') || src?.startsWith('/')
                   ? src
                   : `/static/articles/${article.slug}/${src}`;
-              return <img src={fullSrc} alt={alt} className="rounded-xl shadow-lg my-4 w-full" loading="lazy" />;
+              const rotMatch = (title as string | undefined)?.match(/^r:(\d+)$/);
+              const rotation = rotMatch ? parseInt(rotMatch[1]) : 0;
+              return (
+                <img
+                  src={fullSrc}
+                  alt={alt}
+                  className="rounded-xl shadow-lg my-4 w-full"
+                  loading="lazy"
+                  style={rotation ? { transform: `rotate(${rotation}deg)` } : undefined}
+                />
+              );
             },
           }}
         >

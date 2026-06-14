@@ -77,6 +77,12 @@ class ArticleOut(ArticleCard):
     updated_at: datetime
     ai_comment: Optional[str] = None
     ai_comment_model: Optional[str] = None
+    body_size_bytes: int = 0
+
+    @model_validator(mode='after')
+    def compute_body_size(self) -> 'ArticleOut':
+        self.body_size_bytes = len(self.body.encode('utf-8'))
+        return self
 
 
 class ArticleListResponse(BaseModel):

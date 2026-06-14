@@ -32,6 +32,7 @@ export interface Article extends ArticleCard {
   updated_at: string;
   ai_comment: string | null;
   ai_comment_model: string | null;
+  body_size_bytes: number;
 }
 
 export interface ArticleListResponse {

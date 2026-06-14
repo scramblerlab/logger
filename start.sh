@@ -21,6 +21,7 @@ echo "aimodel proxy ready (${OLLAMA_BASE_URL})"
 
 # --- Backend ---
 echo "Starting backend on port 8000..."
+lsof -ti :8000 | xargs kill -9 2>/dev/null || true
 cd "$PROJECT_DIR/backend"
 .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
 BACKEND_PID=$!
