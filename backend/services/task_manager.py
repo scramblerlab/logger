@@ -175,6 +175,13 @@ async def _run(db_factory, classifier_module) -> None:
         )
         _state.update({"status": "done", "progress": msg, "current_title": ""})
 
+        if updated > 0:
+            from services.push_service import broadcast_push
+            await broadcast_push(db_factory,
+                title="✦ AI分類完了",
+                body=f"{updated}件の記事を分類しました",
+                url="/")
+
     except asyncio.CancelledError:
         _state.update({"status": "idle", "progress": "", "current_title": ""})
         raise
@@ -261,6 +268,13 @@ async def _run_comment(db_factory, commenter_module) -> None:
             else f"完了: {updated}/{total}件にAIコメントを追加 ({failed}件失敗)"
         )
         _comment_state.update({"status": "done", "progress": msg, "current_title": ""})
+
+        if updated > 0:
+            from services.push_service import broadcast_push
+            await broadcast_push(db_factory,
+                title="✦ AIコメント完了",
+                body=f"{updated}件の記事にコメントを追加しました",
+                url="/")
 
     except asyncio.CancelledError:
         _comment_state.update({"status": "idle", "progress": "", "current_title": ""})

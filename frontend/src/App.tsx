@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
 import Home from './pages/Home';
@@ -11,6 +11,12 @@ const ShopifyImportPage = lazy(() => import('./pages/ShopifyImportPage'));
 
 function AppInner() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+    }
+  }, []);
 
   const handleSearch = (q: string) => {
     navigate(`/?q=${encodeURIComponent(q)}`);

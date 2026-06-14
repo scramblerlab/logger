@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 
 interface Props {
   code: string;
@@ -7,7 +7,7 @@ interface Props {
   onFocus: () => void;
 }
 
-export default function CodeBlock({ code, language, onChange, onFocus }: Props) {
+export default React.memo(function CodeBlock({ code, language, onChange, onFocus }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const handleFocus = () => {
@@ -54,4 +54,4 @@ export default function CodeBlock({ code, language, onChange, onFocus }: Props) 
       />
     </div>
   );
-}
+});
