@@ -11,6 +11,7 @@ import ShopifyExportPanel from '../components/ShopifyExportPanel';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
 import { useTranslation } from '../context/TranslationContext';
+import { usePushNotification } from '../hooks/usePushNotification';
 import LoginModal from '../components/LoginModal';
 
 const PAGE_SIZE = 18;
@@ -49,8 +50,9 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor, logout } = useAuth();
-  const { setOnComplete } = useAiJob();
+  const { setOnComplete, status: aiStatus, progress: aiProgress, startJob, commentStatus, commentProgress, startCommentJob } = useAiJob();
   const { registerHandlers } = useTranslation();
+  const { supported: pushSupported, permission: pushPermission, subscribed: pushSubscribed, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotification();
 
   useEffect(() => {
     api.articles.list({ page: 1, limit: 1, sort: 'published' }).then((data) => {
@@ -218,13 +220,33 @@ export default function Home() {
     <div className={`max-w-7xl mx-auto px-4 py-8 ${bulkMode || exportMode ? 'pb-28' : ''}`}>
       {/* Mobile: action buttons (editor only) */}
       {isEditor && (
-        <div className="flex gap-2 mb-3 lg:hidden">
+        <div className="flex flex-wrap gap-2 mb-3 lg:hidden">
+          <button
+            onClick={startJob}
+            disabled={aiStatus === 'running'}
+            className="btn btn-solid disabled:opacity-50"
+          >
+            {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
+          </button>
+          <button
+            onClick={startCommentJob}
+            disabled={commentStatus === 'running'}
+            className="btn btn-solid disabled:opacity-50"
+          >
+            {commentStatus === 'running' ? '⏳ AIコメント中...' : 'AIコメント追加'}
+          </button>
           <button
             onClick={() => setShowCategoryEdit(true)}
             className="btn btn-outline"
           >
             カテゴリー編集
           </button>
+        </div>
+      )}
+      {isEditor && (aiStatus !== 'idle' || commentStatus !== 'idle') && (
+        <div className="lg:hidden mb-2 space-y-0.5">
+          {aiStatus !== 'idle' && aiProgress && <p className="text-xs text-amber-400">{aiProgress}</p>}
+          {commentStatus !== 'idle' && commentProgress && <p className="text-xs text-amber-400">{commentProgress}</p>}
         </div>
       )}
 
@@ -248,11 +270,22 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <div className="mt-3 flex">
+        <div className="mt-3 flex items-center gap-3">
           {isEditor ? (
             <button onClick={() => logout()} className="btn btn-solid">ログアウト</button>
           ) : (
             <button onClick={() => setShowLogin(true)} className="btn btn-solid">ログイン</button>
+          )}
+          {isEditor && pushSupported && pushPermission !== 'denied' && (
+            <button
+              onClick={pushSubscribed ? pushUnsubscribe : pushSubscribe}
+              disabled={pushLoading}
+              className="flex items-center gap-1.5 text-sm disabled:opacity-50 transition-colors"
+              style={{ color: pushSubscribed ? '#f59e0b' : '#94a3b8' }}
+            >
+              <span>{pushSubscribed ? '🔔' : '🔕'}</span>
+              <span>{pushLoading ? '...' : pushSubscribed ? 'AI通知 ON' : 'AI通知 OFF'}</span>
+            </button>
           )}
         </div>
       </div>

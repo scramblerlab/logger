@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Block, BlockType } from '../utils/blocks';
 import { createBlock, moveBlock } from '../utils/blocks';
 import ParagraphBlock from './blocks/ParagraphBlock';
@@ -18,19 +18,31 @@ interface Props {
   onUploadImage?: (blockId: string, file: File) => Promise<string | null>;
 }
 
+// Per-block stable callback shapes — one entry per block ID, created once, reused every render.
+type PerBlockCbs = {
+  contentChange: (content: string) => void;
+  listChange: (items: string[]) => void;
+  listOrderedToggle: (ordered: boolean) => void;
+  quoteChange: (content: string, attribution?: string) => void;
+  codeChange: (code: string, language?: string) => void;
+  imageChange: (patch: { src?: string; caption?: string; pendingFile?: File }) => void;
+  videoChange: (patch: { src?: string; url?: string; caption?: string; pendingFile?: File }) => void;
+  onFocus: () => void;
+};
+
 export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [inserterAt, setInserterAt] = useState<number | null>(null); // insert before index (blocks.length = append)
+  const [inserterAt, setInserterAt] = useState<number | null>(null);
   const [showInserter, setShowInserter] = useState(false);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null);
   const [reorderMode, setReorderMode] = useState(false);
   const imageFileRef = useRef<HTMLInputElement>(null);
-  const pendingImageInsertRef = useRef<string | null>(null); // blockId we'll insert image after
+  const pendingImageInsertRef = useRef<string | null>(null);
   const blockEls = useRef<(HTMLDivElement | null)[]>([]);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Always-current ref so async callbacks (image upload .then()) never read stale blocks
+  // Always-current ref so async callbacks never read stale blocks
   const blocksRef = useRef(blocks);
   blocksRef.current = blocks;
 
@@ -39,60 +51,58 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
 
   // ── Block update helpers ─────────────────────────────────────────────────
 
-  const updateBlock = (id: string, patch: Partial<Block>) => {
+  // Stable: onChange === setBlocks (React state setter, never changes reference)
+  const updateBlock = useCallback((id: string, patch: Partial<Block>) => {
     onChange(blocksRef.current.map(b => b.id === id ? { ...b, ...patch } as Block : b));
-  };
+  }, [onChange]);
 
-  const insertBlock = (type: BlockType, beforeIndex: number) => {
+  const insertBlock = useCallback((type: BlockType, beforeIndex: number) => {
     const nb = createBlock(type);
-    const arr = [...blocks];
+    const arr = [...blocksRef.current];
     arr.splice(beforeIndex, 0, nb);
     onChange(arr);
     setSelectedId(nb.id);
-  };
+  }, [onChange]);
 
-  const deleteBlock = (id: string) => {
-    const remaining = blocks.filter(b => b.id !== id);
+  const deleteBlock = useCallback((id: string) => {
+    const remaining = blocksRef.current.filter(b => b.id !== id);
     onChange(remaining.length > 0 ? remaining : [createBlock('paragraph')]);
     setSelectedId(null);
-  };
+  }, [onChange]);
 
-  const changeType = (id: string, type: BlockType) => {
-    const old = blocks.find(b => b.id === id);
+  const changeType = useCallback((id: string, type: BlockType) => {
+    const old = blocksRef.current.find(b => b.id === id);
     if (!old) return;
     const nb = createBlock(type);
-    // Preserve text content where possible
     if ('content' in old && 'content' in nb) (nb as { content: string }).content = (old as { content: string }).content;
-    onChange(blocks.map(b => b.id === id ? { ...nb, id } : b));
-  };
+    onChange(blocksRef.current.map(b => b.id === id ? { ...nb, id } : b));
+  }, [onChange]);
 
   // ── Image upload flow ────────────────────────────────────────────────────
 
-  const handleUploadForBlock = async (blockId: string, file: File) => {
+  const handleUploadForBlock = useCallback(async (blockId: string, file: File) => {
     if (editSlug && onUploadImage) {
       const relPath = await onUploadImage(blockId, file);
       if (relPath) {
         updateBlock(blockId, { src: relPath, pendingFile: undefined } as Partial<Block>);
       }
     }
-    // In new mode, the pendingFile stays on the block until form submission
-  };
+  }, [editSlug, onUploadImage, updateBlock]);
 
-  // Toolbar "insert image" button: inserts a new image block after selected block
-  const handleToolbarInsertImage = () => {
+  const handleToolbarInsertImage = useCallback(() => {
     if (imageFileRef.current) {
       pendingImageInsertRef.current = selectedId;
       imageFileRef.current.value = '';
       imageFileRef.current.click();
     }
-  };
+  }, [selectedId]);
 
-  const handleToolbarImageFile = (file: File) => {
+  const handleToolbarImageFile = useCallback((file: File) => {
     const afterId = pendingImageInsertRef.current;
     pendingImageInsertRef.current = null;
-    const afterIndex = afterId ? blocks.findIndex(b => b.id === afterId) : blocks.length - 1;
+    const afterIndex = afterId ? blocksRef.current.findIndex(b => b.id === afterId) : blocksRef.current.length - 1;
     const nb: Block = { id: crypto.randomUUID(), type: 'image', src: '', caption: undefined, pendingFile: file };
-    const arr = [...blocks];
+    const arr = [...blocksRef.current];
     arr.splice(afterIndex + 1, 0, nb);
     onChange(arr);
     setSelectedId(nb.id);
@@ -101,14 +111,51 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
         if (relPath) updateBlock(nb.id, { src: relPath, pendingFile: undefined } as Partial<Block>);
       });
     }
+  }, [onChange, editSlug, onUploadImage, updateBlock]);
+
+  // ── Per-block stable callback cache ─────────────────────────────────────
+  // Handlers are created once per block ID and reused on every render,
+  // so React.memo on block components can skip re-renders for unchanged blocks.
+
+  const cbCache = useRef(new Map<string, PerBlockCbs>());
+
+  // Evict entries for blocks that have been deleted
+  const liveIds = new Set(blocks.map(b => b.id));
+  for (const id of cbCache.current.keys()) {
+    if (!liveIds.has(id)) cbCache.current.delete(id);
+  }
+
+  // Safety: if updateBlock reference ever changed (shouldn't happen since onChange
+  // is setBlocks, a stable React state setter), clear the cache so handlers rebuild.
+  const prevUpdateBlock = useRef(updateBlock);
+  if (prevUpdateBlock.current !== updateBlock) {
+    cbCache.current.clear();
+    prevUpdateBlock.current = updateBlock;
+  }
+
+  const getCbs = (blockId: string): PerBlockCbs => {
+    if (!cbCache.current.has(blockId)) {
+      cbCache.current.set(blockId, {
+        contentChange:      (content) =>               updateBlock(blockId, { content } as Partial<Block>),
+        listChange:         (items) =>                 updateBlock(blockId, { items } as Partial<Block>),
+        listOrderedToggle:  (ordered) =>               updateBlock(blockId, { ordered } as Partial<Block>),
+        quoteChange:        (content, attribution) =>  updateBlock(blockId, { content, attribution } as Partial<Block>),
+        codeChange:         (code, language) =>        updateBlock(blockId, { code, language } as Partial<Block>),
+        imageChange:        (patch) => {
+          updateBlock(blockId, patch as Partial<Block>);
+          if (patch.pendingFile) handleUploadForBlock(blockId, patch.pendingFile);
+        },
+        videoChange:        (patch) =>                 updateBlock(blockId, patch as Partial<Block>),
+        onFocus:            () =>                      setSelectedId(blockId),
+      });
+    }
+    return cbCache.current.get(blockId)!;
   };
 
   // ── Drag reorder (pointer events) ───────────────────────────────────────
 
   const handleDragStart = (index: number) => setDragFrom(index);
 
-  // Y-coordinate based: pointer capture keeps events on the handle element,
-  // so onPointerOver on siblings never fires. Compute drop target by position instead.
   const handleDragMove = (e: React.PointerEvent) => {
     if (dragFrom === null) return;
     const y = e.clientY;
@@ -130,7 +177,6 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
     setDropAt(null);
   };
 
-  // Long-press initiates drag; short tap just keeps the block selected.
   const startLongPress = (e: React.PointerEvent, index: number) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     longPressTimer.current = setTimeout(() => {
@@ -149,13 +195,14 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
   // ── Render block content ─────────────────────────────────────────────────
 
   const renderBlock = (block: Block) => {
+    const cbs = getCbs(block.id);
     switch (block.type) {
       case 'paragraph':
         return (
           <ParagraphBlock
             content={block.content}
-            onChange={content => updateBlock(block.id, { content } as Partial<Block>)}
-            onFocus={() => setSelectedId(block.id)}
+            onChange={cbs.contentChange}
+            onFocus={cbs.onFocus}
           />
         );
       case 'heading':
@@ -163,8 +210,8 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
           <HeadingBlock
             content={block.content}
             level={block.level}
-            onChange={content => updateBlock(block.id, { content } as Partial<Block>)}
-            onFocus={() => setSelectedId(block.id)}
+            onChange={cbs.contentChange}
+            onFocus={cbs.onFocus}
           />
         );
       case 'list':
@@ -172,9 +219,9 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
           <ListBlock
             items={block.items}
             ordered={block.ordered}
-            onChange={items => updateBlock(block.id, { items } as Partial<Block>)}
-            onToggleOrdered={ordered => updateBlock(block.id, { ordered } as Partial<Block>)}
-            onFocus={() => setSelectedId(block.id)}
+            onChange={cbs.listChange}
+            onToggleOrdered={cbs.listOrderedToggle}
+            onFocus={cbs.onFocus}
           />
         );
       case 'quote':
@@ -182,8 +229,8 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
           <QuoteBlock
             content={block.content}
             attribution={block.attribution}
-            onChange={(content, attribution) => updateBlock(block.id, { content, attribution } as Partial<Block>)}
-            onFocus={() => setSelectedId(block.id)}
+            onChange={cbs.quoteChange}
+            onFocus={cbs.onFocus}
           />
         );
       case 'code':
@@ -191,8 +238,8 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
           <CodeBlock
             code={block.code}
             language={block.language}
-            onChange={(code, language) => updateBlock(block.id, { code, language } as Partial<Block>)}
-            onFocus={() => setSelectedId(block.id)}
+            onChange={cbs.codeChange}
+            onFocus={cbs.onFocus}
           />
         );
       case 'image':
@@ -203,12 +250,8 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
             rotation={block.rotation}
             pendingFile={block.pendingFile}
             editSlug={editSlug}
-            onChange={patch => {
-              const newBlock = { ...block, ...patch } as Block;
-              updateBlock(block.id, newBlock);
-              if (patch.pendingFile) handleUploadForBlock(block.id, patch.pendingFile);
-            }}
-            onFocus={() => setSelectedId(block.id)}
+            onChange={cbs.imageChange}
+            onFocus={cbs.onFocus}
           />
         );
       case 'video':
@@ -219,8 +262,8 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
             caption={block.caption}
             pendingFile={block.pendingFile}
             editSlug={editSlug}
-            onChange={patch => updateBlock(block.id, patch as Partial<Block>)}
-            onFocus={() => setSelectedId(block.id)}
+            onChange={cbs.videoChange}
+            onFocus={cbs.onFocus}
           />
         );
     }
@@ -269,8 +312,6 @@ export default function BlockEditor({ blocks, onChange, editSlug, onUploadImage 
                   </div>
                 )}
 
-                {/* Reorder handle — full-height left strip, only on selected block in reorder mode.
-                    Long-press (400 ms) initiates drag; short tap just keeps block selected. */}
                 {reorderMode && isSelected && (
                   <div
                     className="absolute left-0 top-0 bottom-0 w-11 flex items-center justify-center rounded-l-xl bg-amber-500/10 border-r border-amber-500/40 cursor-grab active:cursor-grabbing text-amber-400 select-none touch-none z-10"

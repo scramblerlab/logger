@@ -114,6 +114,18 @@ async def init_db():
             """))
             await conn.execute(text("PRAGMA user_version = 4"))
 
+        if version < 5:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS push_subscriptions (
+                    id TEXT PRIMARY KEY,
+                    endpoint TEXT UNIQUE NOT NULL,
+                    p256dh TEXT NOT NULL,
+                    auth TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            await conn.execute(text("PRAGMA user_version = 5"))
+
     # Seed categories
     async with SessionLocal() as session:
         from sqlalchemy import select

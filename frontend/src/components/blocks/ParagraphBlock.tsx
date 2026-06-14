@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface Props {
   content: string;
@@ -7,7 +7,7 @@ interface Props {
   placeholder?: string;
 }
 
-export default function ParagraphBlock({ content, onChange, onFocus, placeholder = '本文を入力...' }: Props) {
+export default React.memo(function ParagraphBlock({ content, onChange, onFocus, placeholder = '本文を入力...' }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const resize = () => {
@@ -37,4 +37,4 @@ export default function ParagraphBlock({ content, onChange, onFocus, placeholder
       className="w-full bg-transparent text-slate-100 text-base leading-relaxed resize-none outline-none placeholder-slate-600 py-1"
     />
   );
-}
+});

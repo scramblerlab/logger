@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 
 interface Props {
   content: string;
@@ -13,7 +13,7 @@ const sizeClass: Record<2 | 3 | 4, string> = {
   4: 'text-lg font-semibold',
 };
 
-export default function HeadingBlock({ content, level, onChange, onFocus }: Props) {
+export default React.memo(function HeadingBlock({ content, level, onChange, onFocus }: Props) {
   const ref = useRef<HTMLInputElement>(null);
 
   const handleFocus = () => {
@@ -34,4 +34,4 @@ export default function HeadingBlock({ content, level, onChange, onFocus }: Prop
       className={`w-full bg-transparent text-slate-100 outline-none placeholder-slate-600 py-1 ${sizeClass[level]}`}
     />
   );
-}
+});

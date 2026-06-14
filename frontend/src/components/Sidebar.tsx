@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Category, Tag } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
+import { usePushNotification } from '../hooks/usePushNotification';
 import LoginModal from './LoginModal';
 
 interface Props {
@@ -26,6 +27,7 @@ export default function Sidebar({
 }: Props) {
   const { isEditor, logout } = useAuth();
   const { status: aiStatus, progress: aiProgress, startJob, commentStatus, commentProgress, startCommentJob } = useAiJob();
+  const { supported: pushSupported, permission: pushPermission, subscribed: pushSubscribed, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotification();
   const [showLogin, setShowLogin] = useState(false);
   return (
     <>
@@ -151,6 +153,20 @@ export default function Sidebar({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8v-1a3 3 0 013-3h10a3 3 0 013 3v1m-4 8l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             Shopifyブログにエクスポート
+          </button>
+        </div>
+      )}
+      {isEditor && pushSupported && pushPermission !== 'denied' && (
+        <div className="pt-3 border-t border-rim">
+          <button
+            onClick={pushSubscribed ? pushUnsubscribe : pushSubscribe}
+            disabled={pushLoading}
+            title={pushSubscribed ? 'AI完了通知を無効にする' : 'AI完了通知を有効にする'}
+            className="flex items-center gap-2 text-sm disabled:opacity-50 transition-colors w-full text-left"
+            style={{ color: pushSubscribed ? '#f59e0b' : '#94a3b8' }}
+          >
+            <span className="text-base">{pushSubscribed ? '🔔' : '🔕'}</span>
+            <span>{pushLoading ? '...' : pushSubscribed ? 'AI通知: ON' : 'AI通知: OFF'}</span>
           </button>
         </div>
       )}

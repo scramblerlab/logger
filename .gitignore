@@ -25,3 +25,6 @@ __pycache__/
 
 # Editor credentials — plaintext passwords, never commit
 backend/editors.json
+
+# VAPID private key for Web Push (generate once, never commit)
+backend/vapid_private.pem

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 
 interface Props {
   items: string[];
@@ -8,7 +8,7 @@ interface Props {
   onFocus: () => void;
 }
 
-export default function ListBlock({ items, ordered, onChange, onFocus }: Props) {
+export default React.memo(function ListBlock({ items, ordered, onChange, onFocus }: Props) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handleFocus = (i: number) => {
@@ -59,4 +59,4 @@ export default function ListBlock({ items, ordered, onChange, onFocus }: Props) 
       ))}
     </div>
   );
-}
+});

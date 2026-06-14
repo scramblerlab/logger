@@ -19,7 +19,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from database import init_db, DATA_DIR
-from routers import articles, categories, search, importer, auth, ai_chat, translate, extract, shared_storage
+from routers import articles, categories, search, importer, auth, ai_chat, translate, extract, shared_storage, push
 from routers import shopify_importer
 from routers.auth import limiter
 from services import task_manager
@@ -72,6 +72,7 @@ app.include_router(ai_chat.router)
 app.include_router(translate.router)
 app.include_router(extract.router)
 app.include_router(shared_storage.router)
+app.include_router(push.router)
 
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -86,6 +87,23 @@ if FRONTEND_DIST.exists():
     @app.get("/icons.svg")
     async def icons():
         return FileResponse(FRONTEND_DIST / "icons.svg")
+
+    @app.get("/manifest.json")
+    async def manifest():
+        return FileResponse(FRONTEND_DIST / "manifest.json", media_type="application/manifest+json")
+
+    @app.get("/sw.js")
+    async def service_worker():
+        return FileResponse(FRONTEND_DIST / "sw.js", media_type="application/javascript",
+                            headers={"Service-Worker-Allowed": "/"})
+
+    @app.get("/icon-192.png")
+    async def icon_192():
+        return FileResponse(FRONTEND_DIST / "icon-192.png", media_type="image/png")
+
+    @app.get("/icon-512.png")
+    async def icon_512():
+        return FileResponse(FRONTEND_DIST / "icon-512.png", media_type="image/png")
 
 
 @app.get("/api/health")

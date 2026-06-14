@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface Props {
   content: string;
@@ -35,7 +35,7 @@ function AutoTextarea({
   );
 }
 
-export default function QuoteBlock({ content, attribution, onChange, onFocus }: Props) {
+export default React.memo(function QuoteBlock({ content, attribution, onChange, onFocus }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   const handleFocus = () => {
@@ -63,4 +63,4 @@ export default function QuoteBlock({ content, attribution, onChange, onFocus }: 
       />
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 
 interface Props {
   src: string;
@@ -10,7 +10,7 @@ interface Props {
   onFocus: () => void;
 }
 
-export default function ImageBlock({ src, caption, rotation, pendingFile, editSlug, onChange, onFocus }: Props) {
+export default React.memo(function ImageBlock({ src, caption, rotation, pendingFile, editSlug, onChange, onFocus }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -83,4 +83,4 @@ export default function ImageBlock({ src, caption, rotation, pendingFile, editSl
       />
     </div>
   );
-}
+});

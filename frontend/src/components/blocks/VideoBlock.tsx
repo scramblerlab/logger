@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 interface Props {
   src?: string;
@@ -20,7 +20,7 @@ function getVimeoId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-export default function VideoBlock({ src, url, caption, pendingFile, editSlug, onChange, onFocus }: Props) {
+export default React.memo(function VideoBlock({ src, url, caption, pendingFile, editSlug, onChange, onFocus }: Props) {
   const [mode, setMode] = useState<'url' | 'file'>(url ? 'url' : 'file');
   const fileRef = useRef<HTMLInputElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -136,4 +136,4 @@ export default function VideoBlock({ src, url, caption, pendingFile, editSlug, o
       />
     </div>
   );
-}
+});
