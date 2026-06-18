@@ -6,6 +6,7 @@ import { api, heroImageUrl } from '../api/client';
 import type { Article, Category } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/TranslationContext';
+import { copyToClipboard } from '../utils/clipboard';
 
 export default function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -15,6 +16,7 @@ export default function ArticlePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [translatedContent, setTranslatedContent] = useState<{ title: string; body: string; ai_comment: string | null } | null>(null);
+  const [copied, setCopied] = useState(false);
   const { registerHandlers } = useTranslation();
 
   const articleRef = useRef<Article | null>(null);
@@ -67,6 +69,14 @@ export default function ArticlePage() {
     navigate('/');
   };
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}/articles/${article.slug}`;
+    if (await copyToClipboard(url)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <article className="max-w-3xl mx-auto px-4 py-10">
       {/* Action buttons — fixed below header, top-right (editor only) */}
@@ -106,7 +116,13 @@ export default function ArticlePage() {
         {translatedContent?.title ?? article.title}
       </h1>
 
-      {date && <p className="text-sm text-slate-500 mb-6">{date}</p>}
+      {date && <p className="text-sm text-slate-500 mb-2">{date}</p>}
+
+      <div className="mb-6">
+        <button onClick={handleShare} className="btn btn-outline">
+          {copied ? 'コピーしました' : 'リンクをコピー'}
+        </button>
+      </div>
 
       {article.ai_comment && (
         <div className="mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5">
