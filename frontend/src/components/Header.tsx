@@ -5,6 +5,7 @@ import { useAiJob } from '../context/AiJobContext';
 import { useTranslation } from '../context/TranslationContext';
 import TranslateButton from './TranslateButton';
 import ExtractDialog from './ExtractDialog';
+import logo from '../assets/logo.png';
 
 interface Props {
   onSearch: (q: string) => void;
@@ -47,8 +48,8 @@ export default function Header({ onSearch }: Props) {
 
         {/* ── Row 1: Logo + Search  +  (desktop) nav ── */}
         <div className="h-12 sm:h-16 flex items-center gap-4">
-          <Link to="/" className="font-display text-xl tracking-wide text-amber-400 flex-shrink-0">
-            GENERATIVE LOGGER
+          <Link to="/" className="flex-shrink-0" aria-label="Generative Logger — home">
+            <img src={logo} alt="Generative Logger" className="h-9 sm:h-12 w-auto" />
           </Link>
 
           {/* Search — visible on all breakpoints */}
