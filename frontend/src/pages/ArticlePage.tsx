@@ -79,24 +79,25 @@ export default function ArticlePage() {
 
   return (
     <article className="max-w-3xl mx-auto px-4 py-10">
-      {/* Action buttons — fixed below header, top-right (editor only) */}
-      {isEditor && (
-        <div className="fixed top-[92px] sm:top-[72px] right-4 z-30 flex gap-2">
-          <Link to={`/write?edit=${article.slug}`} className="btn btn-solid shadow-lg">
-            編集
-          </Link>
-          <button
-            onClick={handleDelete}
-            className="btn btn-outline hover:bg-red-600 hover:border-red-600 hover:text-white shadow-lg"
-          >
-            削除
-          </button>
-        </div>
-      )}
-
-      <Link to="/" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-amber-400 mb-6 transition-colors">
-        ← 一覧に戻る
-      </Link>
+      {/* Back link (left) + action buttons (right, editor only) on one row */}
+      <div className="flex items-center justify-between gap-2 mb-6">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-amber-400 transition-colors">
+          ← 一覧に戻る
+        </Link>
+        {isEditor && (
+          <div className="flex gap-2">
+            <Link to={`/write?edit=${article.slug}`} className="btn btn-solid shadow-lg">
+              編集
+            </Link>
+            <button
+              onClick={handleDelete}
+              className="btn btn-outline hover:bg-red-600 hover:border-red-600 hover:text-white shadow-lg"
+            >
+              削除
+            </button>
+          </div>
+        )}
+      </div>
 
       {imgUrl && (
         <div className="rounded-2xl overflow-hidden mb-8 shadow-2xl">

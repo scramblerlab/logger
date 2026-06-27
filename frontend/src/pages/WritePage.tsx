@@ -548,6 +548,17 @@ export default function WritePage() {
           </div>
         )}
 
+        {/* Bottom submit (mirrors the sticky header button) */}
+        <div className="pt-2 flex justify-end">
+          <button
+            type="submit"
+            disabled={submitting || !title.trim()}
+            className="btn btn-solid disabled:opacity-50 min-w-[7rem] text-left"
+          >
+            {submitting ? (submitStatus ?? '準備中...') : editSlug ? '更新する' : '投稿する'}
+          </button>
+        </div>
+
       </form>
 
       {/* Post result banner */}
