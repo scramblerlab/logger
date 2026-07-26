@@ -9,6 +9,7 @@ import LoginModal from './LoginModal';
 interface Props {
   categories: Category[];
   tags: Tag[];
+  allCount?: number;
   activeCategory: string | null;
   onSelectCategory: (slug: string | null) => void;
   onSelectTag: (tag: string) => void;
@@ -20,7 +21,7 @@ interface Props {
 }
 
 export default function Sidebar({
-  categories, tags, activeCategory,
+  categories, tags, allCount, activeCategory,
   onSelectCategory, onSelectTag,
   onOpenCategoryEdit, onBulkCategorize, onShopifyExport,
   categoryLabels, labels,
@@ -76,13 +77,16 @@ export default function Sidebar({
           <li>
             <button
               onClick={() => onSelectCategory(null)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
                 !activeCategory
                   ? 'bg-amber-500/20 text-amber-400 font-medium'
                   : 'text-slate-400 hover:bg-surface2 hover:text-slate-100'
               }`}
             >
-              {labels?.all ?? 'すべて / All'}
+              <span className="flex-1">{labels?.all ?? 'すべて / All'}</span>
+              {!!allCount && (
+                <span className="text-xs text-slate-500 tabular-nums">{allCount}</span>
+              )}
             </button>
           </li>
           {categories.map((cat) => (
