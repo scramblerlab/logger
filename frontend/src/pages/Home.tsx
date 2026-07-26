@@ -214,7 +214,11 @@ export default function Home() {
           alt={heroArticle.title}
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/70" />
+        <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+          <h1 className="font-display text-3xl sm:text-5xl tracking-widest text-amber-500 select-none">
+            GENERATIVE LOGGER
+          </h1>
+        </div>
       </div>
     )}
     <div className={`max-w-7xl mx-auto px-4 py-8 ${bulkMode || exportMode ? 'pb-28' : ''}`}>
@@ -266,7 +270,7 @@ export default function Home() {
               className={`btn ${activeCategory === c.slug ? 'text-white' : 'btn-outline'}`}
               style={activeCategory === c.slug ? { backgroundColor: c.color } : {}}
             >
-              {translatedCategoryLabels?.get(c.slug) ?? c.name_ja}{c.article_count > 0 && <span className="ml-1 opacity-60">{c.article_count}</span>}
+              {translatedCategoryLabels?.get(c.slug) ?? c.name_ja}
             </button>
           ))}
         </div>
