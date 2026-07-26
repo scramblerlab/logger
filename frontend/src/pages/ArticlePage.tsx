@@ -168,6 +168,14 @@ export default function ArticlePage() {
                 />
               );
             },
+            a: ({ href, children }) => {
+              const raw = href ?? '';
+              // Internal routes and anchors stay in the same tab
+              if (raw.startsWith('/') || raw.startsWith('#')) return <a href={raw}>{children}</a>;
+              // Scheme-less hrefs (example.com/foo) would otherwise resolve as SPA routes
+              const url = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`;
+              return <a href={url} target="_blank" rel="noopener noreferrer">{children}</a>;
+            },
           }}
         >
           {translatedContent?.body ?? article.body}

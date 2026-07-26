@@ -17,9 +17,13 @@ router = APIRouter(prefix="/api/categories", tags=["categories"])
 async def list_categories(db: AsyncSession = Depends(get_db)):
     cats = (await db.execute(select(Category).order_by(Category.name_en))).scalars().all()
 
-    # Count articles per category in one correlated subquery
+    # Count articles per category in one correlated subquery.
+    # Column references must be qualified: a bare `slug` inside the subquery
+    # binds to articles.slug, not categories.slug, making every count 0.
     count_rows = (await db.execute(text(
-        "SELECT slug, (SELECT COUNT(*) FROM articles WHERE categories LIKE '%\"' || slug || '\"%') AS cnt"
+        "SELECT categories.slug,"
+        " (SELECT COUNT(*) FROM articles"
+        "  WHERE articles.categories LIKE '%\"' || categories.slug || '\"%') AS cnt"
         " FROM categories"
     ))).fetchall()
     counts = {row[0]: row[1] for row in count_rows}

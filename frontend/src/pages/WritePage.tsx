@@ -329,7 +329,7 @@ export default function WritePage() {
   const labelCls = 'block text-sm font-medium text-slate-400 mb-1';
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 pb-24">
+    <div className="max-w-3xl mx-auto px-4 py-6 pb-32">
       {/* Sticky header */}
       <div className="sticky top-0 z-30 bg-canvas/95 backdrop-blur border-b border-rim pb-3 mb-6 -mx-4 px-4 pt-4">
         <div className="flex items-center gap-3">
