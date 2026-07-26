@@ -27,6 +27,7 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<ArticleCardType[] | null>(null);
   const [showCategoryEdit, setShowCategoryEdit] = useState(false);
   const [heroArticle, setHeroArticle] = useState<ArticleCardType | null>(null);
+  const [allCount, setAllCount] = useState(0);
   const [translatedTitles, setTranslatedTitles] = useState<Map<string, string> | null>(null);
   const [translatedCategoryLabels, setTranslatedCategoryLabels] = useState<Map<string, string> | null>(null);
   const [translatedLabels, setTranslatedLabels] = useState<{ category: string; all: string; tag: string } | null>(null);
@@ -63,6 +64,7 @@ export default function Home() {
   const reloadCategories = useCallback(() => {
     api.categories.list().then(setCategories).catch(() => {});
     api.categories.tags(50).then(setTags).catch(() => {});
+    api.articles.list({ page: 1, limit: 1 }).then((data) => setAllCount(data.total)).catch(() => {});
   }, []);
 
   useEffect(() => { reloadCategories(); }, [reloadCategories]);
@@ -298,6 +300,7 @@ export default function Home() {
         <div className="hidden lg:block">
           <Sidebar
             categories={categories} tags={tags}
+            allCount={allCount}
             activeCategory={activeCategory}
             onSelectCategory={handleSelectCategory}
             onSelectTag={handleSelectTag}
