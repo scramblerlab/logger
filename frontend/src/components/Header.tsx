@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
 import { useTranslation } from '../context/TranslationContext';
+import { useSearchResults } from '../context/SearchContext';
 import TranslateButton from './TranslateButton';
 import ExtractDialog from './ExtractDialog';
 import logo from '../assets/logo.png';
@@ -18,6 +19,7 @@ export default function Header({ onSearch }: Props) {
   const { isEditor } = useAuth();
   const { status: aiStatus, currentTitle: aiTitle } = useAiJob();
   const { translating, translated, triggerTranslate, triggerReset } = useTranslation();
+  const { hitCount } = useSearchResults();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,17 +30,24 @@ export default function Header({ onSearch }: Props) {
   };
 
   const searchInput = (
-    <div className="relative">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="記事を検索 / Search..."
-        className="w-full pl-9 pr-4 py-2 text-sm bg-surface2 border border-rim text-slate-100 placeholder-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-      />
-      <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
+    <div className="flex items-center gap-2">
+      <div className="relative flex-1 min-w-0">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="記事を検索 / Search..."
+          className="w-full pl-9 pr-4 py-2 text-sm bg-surface2 border border-rim text-slate-100 placeholder-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+        />
+        <svg className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      {hitCount !== null && (
+        <span className="flex-shrink-0 text-xs tabular-nums text-amber-400 whitespace-nowrap">
+          {hitCount}件
+        </span>
+      )}
     </div>
   );
 

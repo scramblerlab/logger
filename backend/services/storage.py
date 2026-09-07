@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
@@ -6,7 +7,9 @@ from pathlib import Path
 from typing import Optional
 
 import aiofiles
-from PIL import Image
+from PIL import Image, ImageOps
+
+logger = logging.getLogger(__name__)
 
 DATA_DIR = os.getenv("DATA_DIR", "./data")
 ARTICLES_DIR = os.path.join(DATA_DIR, "articles")
@@ -42,6 +45,23 @@ async def save_upload(slug: str, data: bytes, filename: str, is_hero: bool = Fal
 def _write_and_optimize(data: bytes, dest: Path):
     import io
     img = Image.open(io.BytesIO(data))
+
+    # Phone cameras store portrait shots as landscape pixels plus an EXIF
+    # Orientation tag. JPEG output here drops EXIF, so without baking the
+    # rotation into the pixels first every portrait photo is saved sideways.
+    orientation = None
+    try:
+        orientation = img.getexif().get(0x0112)
+    except Exception:
+        pass
+    size_before = img.size
+    img = ImageOps.exif_transpose(img) or img
+    if orientation not in (None, 0, 1) or size_before != img.size:
+        logger.info(
+            "exif orientation=%s applied to %s: %s -> %s",
+            orientation, dest.name, size_before, img.size,
+        )
+
     if img.mode not in ("RGB", "RGBA"):
         img = img.convert("RGB")
     elif img.mode == "RGBA":
@@ -55,6 +75,7 @@ def _write_and_optimize(data: bytes, dest: Path):
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     img.save(str(dest), "JPEG", quality=JPEG_QUALITY, optimize=True)
+    logger.debug("saved %s (%dx%d, %d bytes)", dest, img.size[0], img.size[1], dest.stat().st_size)
 
 
 async def download_and_save(slug: str, url: str, filename: str, is_hero: bool = False) -> Optional[str]:

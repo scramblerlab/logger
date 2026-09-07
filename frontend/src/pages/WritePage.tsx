@@ -12,7 +12,9 @@ const inputCls = 'w-full bg-surface2 border border-rim2 text-slate-100 placehold
 
 async function rotateFile(file: File, degrees: 0 | 90 | 180 | 270): Promise<File> {
   if (degrees === 0) return file;
-  const img = await createImageBitmap(file);
+  // Explicit orientation: the spec default changed over time and Safari/iOS has
+  // differed, which would compound with the EXIF rotation the backend bakes in.
+  const img = await createImageBitmap(file, { imageOrientation: 'from-image' });
   const swap = degrees === 90 || degrees === 270;
   const canvas = document.createElement('canvas');
   canvas.width = swap ? img.height : img.width;
@@ -39,8 +41,8 @@ async function bakeBlockRotation(block: import('../utils/blocks').Block & { type
   try {
     const blob = await (await fetch(fetchUrl)).blob();
     const rotated = await rotateFile(new File([blob], 'image.jpg', { type: 'image/jpeg' }), block.rotation);
-    const relPath = await uploadImageToSlug(slug, rotated);
-    if (relPath) return { ...block, src: relPath, rotation: undefined };
+    const uploaded = await uploadImageToSlug(slug, rotated);
+    if (uploaded.ok) return { ...block, src: uploaded.relPath, rotation: undefined };
   } catch { /* ignore — keep original with CSS rotation as fallback */ }
   return block;
 }
@@ -60,16 +62,50 @@ async function pollJob<T>(
   throw new Error('タイムアウトしました');
 }
 
-async function uploadImageToSlug(slug: string, file: File): Promise<string | null> {
+const UPLOAD_TIMEOUT_MS = 60000;
+
+type UploadResult =
+  | { ok: true; relPath: string }
+  | { ok: false; reason: 'timeout' | 'http' | 'network'; detail: string };
+
+function uploadErrorMessage(r: Extract<UploadResult, { ok: false }>): string {
+  if (r.reason === 'timeout') {
+    return `画像のアップロードがタイムアウトしました（${UPLOAD_TIMEOUT_MS / 1000}秒）。通信環境を確認して、もう一度お試しください。`;
+  }
+  if (r.reason === 'http') return `画像のアップロードに失敗しました（${r.detail}）。`;
+  return `画像のアップロードに失敗しました（通信エラー: ${r.detail}）。`;
+}
+
+async function uploadImageToSlug(slug: string, file: File): Promise<UploadResult> {
   const form = new FormData();
   form.append('image', file);
+  const started = Date.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), UPLOAD_TIMEOUT_MS);
+  console.info('[upload] start', { slug, name: file.name, bytes: file.size, type: file.type });
   try {
     const res = await fetch(`/api/articles/${slug}/images`, {
-      method: 'POST', body: form, credentials: 'include',
+      method: 'POST', body: form, credentials: 'include', signal: ctrl.signal,
     });
-    if (!res.ok) return null;
-    return (await res.json()).rel_path as string;
-  } catch { return null; }
+    const elapsed = Date.now() - started;
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[upload] http error', { slug, name: file.name, status: res.status, elapsed, body });
+      return { ok: false, reason: 'http', detail: `${res.status} ${res.statusText}` };
+    }
+    const relPath = (await res.json()).rel_path as string;
+    console.info('[upload] done', { slug, name: file.name, relPath, elapsed });
+    return { ok: true, relPath };
+  } catch (err) {
+    const elapsed = Date.now() - started;
+    const aborted = err instanceof DOMException && err.name === 'AbortError';
+    console.error('[upload] failed', { slug, name: file.name, aborted, elapsed, err });
+    return aborted
+      ? { ok: false, reason: 'timeout', detail: `${elapsed}ms` }
+      : { ok: false, reason: 'network', detail: err instanceof Error ? err.message : String(err) };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export default function WritePage() {
@@ -95,6 +131,8 @@ export default function WritePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [publishedAt, setPublishedAt] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceSite, setSourceSite] = useState<string | null>(null);
+  const [guestVisible, setGuestVisible] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
   const [classifying, setClassifying] = useState(false);
@@ -121,6 +159,8 @@ export default function WritePage() {
         const url = heroImageUrl(art.slug, art.hero_image, art.updated_at);
         if (url) setHeroPreview(url);
         if (art.ai_comment) setCurrentComment(art.ai_comment);
+        setSourceSite(art.source_site);
+        setGuestVisible(art.guest_visible);
       }).catch(() => {});
     }
   }, [editSlug]);
@@ -138,6 +178,10 @@ export default function WritePage() {
     setTitle(extraction.title);
     setBlocks(parseMarkdown(extraction.body));
     setSourceUrl(extraction.source_url ?? '');
+    // URL-extracted articles are someone else's content: hidden from guests
+    // until the editor explicitly opts in.
+    setSourceSite('extract');
+    setGuestVisible(false);
     if (extraction.published_at) setPublishedAt(extraction.published_at.slice(0, 16));
     if (extraction.hero_url) {
       fetch(extraction.hero_url)
@@ -197,7 +241,11 @@ export default function WritePage() {
       } else {
         setClassifyMsg('カテゴリーを判定できませんでした');
       }
-    } catch { setClassifyMsg('エラーが発生しました'); }
+    } catch (err) {
+      // pollJob throws 'タイムアウトしました' after 180s — show it instead of
+      // collapsing every failure into a generic message.
+      setClassifyMsg(err instanceof Error ? `エラー: ${err.message}` : 'エラーが発生しました');
+    }
     finally { setClassifying(false); }
   };
 
@@ -209,14 +257,33 @@ export default function WritePage() {
       const result = await pollJob(() => api.articles.aiCommentStatus(editSlug));
       setCurrentComment(result.ai_comment);
       setCommentMsg(`生成完了 (${result.ai_comment_model})`);
-    } catch { setCommentMsg('エラーが発生しました'); }
+    } catch (err) {
+      setCommentMsg(err instanceof Error ? `エラー: ${err.message}` : 'エラーが発生しました');
+    }
     finally { setCommenting(false); }
   };
 
+  // In-flight block image uploads, keyed by block id. BlockEditor fires these
+  // without awaiting them, so submit must drain this map before serializing —
+  // otherwise a block whose upload has not landed yet still has an empty `src`
+  // and serializeBlocks() silently drops it.
+  const pendingUploads = useRef(new Map<string, Promise<UploadResult>>());
+
   // Handle image upload from BlockEditor (edit mode)
-  const handleBlockImageUpload = async (_blockId: string, file: File): Promise<string | null> => {
+  const handleBlockImageUpload = async (blockId: string, file: File): Promise<string | null> => {
     if (!editSlug) return null;
-    return uploadImageToSlug(editSlug, file);
+    const task = uploadImageToSlug(editSlug, file);
+    pendingUploads.current.set(blockId, task);
+    try {
+      const result = await task;
+      if (!result.ok) {
+        setPostError(uploadErrorMessage(result));
+        return null;
+      }
+      return result.relPath;
+    } finally {
+      if (pendingUploads.current.get(blockId) === task) pendingUploads.current.delete(blockId);
+    }
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -227,14 +294,67 @@ export default function WritePage() {
     setPostResult(null);
 
     try {
-      // ── Step 1: Bake image rotations (edit mode) ─────────────────────────
+      // ── Step 0: Drain in-flight uploads, then rescue any stragglers ──────
+      // Without this, hitting "更新する" right after adding an image races the
+      // fire-and-forget upload and the image block is dropped on serialize.
       let blocksToSave = blocks;
+      if (pendingUploads.current.size > 0) {
+        const inFlight = [...pendingUploads.current.entries()];
+        setSubmitStatus(`画像アップロードの完了を待機中 (${inFlight.length})...`);
+        const results = await Promise.all(inFlight.map(([, task]) => task));
+        // Read paths straight off the results rather than out of React state —
+        // setBlocks from the upload callback may not have flushed yet.
+        const resolved = new Map<string, string>();
+        inFlight.forEach(([id], i) => {
+          const r = results[i];
+          if (r.ok) resolved.set(id, r.relPath);
+        });
+        if (resolved.size > 0) {
+          blocksToSave = blocksToSave.map(b =>
+            resolved.has(b.id) ? { ...b, src: resolved.get(b.id)!, pendingFile: undefined } : b,
+          ) as Block[];
+        }
+      }
+
       if (editSlug) {
-        const rotated = blocks.filter(b => b.type === 'image' && b.rotation);
+        // Safety net: anything still holding a pendingFile with no src (upload
+        // never started, or its result never made it back into state).
+        const stranded = blocksToSave.filter(
+          (b): b is Block & { type: 'image'; pendingFile: File } =>
+            b.type === 'image' && !!b.pendingFile && !b.src,
+        );
+        if (stranded.length > 0) {
+          const resolved = new Map<string, string>();
+          for (let i = 0; i < stranded.length; i++) {
+            setSubmitStatus(`画像をアップロード中 (${i + 1}/${stranded.length})...`);
+            const b = stranded[i];
+            const file = b.rotation ? await rotateFile(b.pendingFile, b.rotation) : b.pendingFile;
+            const result = await uploadImageToSlug(editSlug, file);
+            if (!result.ok) throw new Error(uploadErrorMessage(result));
+            resolved.set(b.id, result.relPath);
+          }
+          blocksToSave = blocksToSave.map(b =>
+            resolved.has(b.id)
+              ? { ...b, src: resolved.get(b.id)!, pendingFile: undefined, rotation: undefined }
+              : b,
+          ) as Block[];
+          setBlocks(blocksToSave);
+        }
+
+        // Never drop an image without telling the user.
+        const lost = blocksToSave.filter(b => b.type === 'image' && !b.src).length;
+        if (lost > 0) {
+          throw new Error(`画像${lost}件をアップロードできませんでした。保存を中止しました。もう一度お試しください。`);
+        }
+      }
+
+      // ── Step 1: Bake image rotations (edit mode) ─────────────────────────
+      if (editSlug) {
+        const rotated = blocksToSave.filter(b => b.type === 'image' && b.rotation);
         if (rotated.length > 0) {
           let done = 0;
           setSubmitStatus(`画像を回転処理中 (0/${rotated.length})...`);
-          blocksToSave = await Promise.all(blocks.map(async b => {
+          blocksToSave = await Promise.all(blocksToSave.map(async b => {
             if (b.type === 'image' && b.rotation) {
               const result = await bakeBlockRotation(b, editSlug);
               done++;
@@ -262,6 +382,7 @@ export default function WritePage() {
       form.append('body', body);
       form.append('categories', JSON.stringify(selectedCats));
       form.append('tags', JSON.stringify(tags));
+      form.append('guest_visible', String(guestVisible));
 
       if (editSlug) {
         if (publishedAt) form.append('published_at', publishedAt);
@@ -276,6 +397,7 @@ export default function WritePage() {
         });
       } else {
         if (sourceUrl) form.append('source_url', sourceUrl);
+        if (sourceSite) form.append('source_site', sourceSite);
         if (rotatedHero) form.append('hero_image', rotatedHero);
 
         // Collect pending image files from blocks (new mode two-pass)
@@ -300,8 +422,11 @@ export default function WritePage() {
           const { file, placeholder, rotation } = pendingImages[i];
           setSubmitStatus(`画像をアップロード中 (${i + 1}/${pendingImages.length})...`);
           const fileToUpload = rotation ? await rotateFile(file, rotation) : file;
-          const relPath = await uploadImageToSlug(created.slug, fileToUpload);
-          if (relPath) finalBody = finalBody.split(placeholder).join(relPath);
+          const uploaded = await uploadImageToSlug(created.slug, fileToUpload);
+          // The article already exists at this point, so surface the failure
+          // rather than leaving a "pending:" placeholder in the saved body.
+          if (!uploaded.ok) throw new Error(uploadErrorMessage(uploaded));
+          finalBody = finalBody.split(placeholder).join(uploaded.relPath);
         }
 
         if (finalBody !== bodyWithPlaceholders) {
@@ -446,7 +571,7 @@ export default function WritePage() {
           </div>
         </div>
 
-        {/* Categories */}
+        {/* Categories — the AI action sits directly above the chips it fills in */}
         <div>
           <div className="flex items-center gap-3 mb-2">
             <label className="text-sm font-medium text-slate-400">カテゴリー</label>
@@ -456,7 +581,7 @@ export default function WritePage() {
               disabled={classifying || !title}
               className="btn btn-solid disabled:opacity-40"
             >
-              {classifying ? '⏳ AI分析中...' : '✦ AI分析'}
+              {classifying ? '⏳ AIカテゴリー分析中...' : '✦ AIカテゴリー分析'}
             </button>
             {classifyMsg && (
               <span className={`text-xs ${classifyMsg.includes('エラー') || classifyMsg.includes('できません') ? 'text-red-400' : 'text-amber-400'}`}>
@@ -464,32 +589,6 @@ export default function WritePage() {
               </span>
             )}
           </div>
-
-          {editSlug && (
-            <div className="mb-3 space-y-2">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleAiComment}
-                  disabled={commenting}
-                  className="btn btn-solid disabled:opacity-40"
-                >
-                  {commenting ? '⏳ 生成中...' : '✦ AIコメント追加/変更'}
-                </button>
-                {commentMsg && (
-                  <span className={`text-xs ${commentMsg.includes('エラー') ? 'text-red-400' : 'text-amber-400'}`}>
-                    {commentMsg}
-                  </span>
-                )}
-              </div>
-              {currentComment && (
-                <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
-                  <p className="text-xs font-semibold text-amber-400 mb-1">✦ AIコメント（現在）</p>
-                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{currentComment}</p>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="flex flex-wrap gap-2">
             {categories.map(cat => (
@@ -505,6 +604,34 @@ export default function WritePage() {
             ))}
           </div>
         </div>
+
+        {/* AI comment — its own feature block, below the category group */}
+        {editSlug && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-slate-400">AIコメント</label>
+              <button
+                type="button"
+                onClick={handleAiComment}
+                disabled={commenting}
+                className="btn btn-solid disabled:opacity-40"
+              >
+                {commenting ? '⏳ AIコメント生成中...' : '✦ AIコメント'}
+              </button>
+              {commentMsg && (
+                <span className={`text-xs ${commentMsg.includes('エラー') ? 'text-red-400' : 'text-amber-400'}`}>
+                  {commentMsg}
+                </span>
+              )}
+            </div>
+            {currentComment && (
+              <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                <p className="text-xs font-semibold text-amber-400 mb-1">✦ AIコメント（現在）</p>
+                <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{currentComment}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tags */}
         <div>
@@ -547,6 +674,26 @@ export default function WritePage() {
             />
           </div>
         )}
+
+        {/* Guest visibility */}
+        <div>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={guestVisible}
+              onChange={e => setGuestVisible(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-amber-500 flex-shrink-0"
+            />
+            <span>
+              <span className="block text-sm text-slate-200">ゲストにも公開する</span>
+              <span className="block text-xs text-slate-500 mt-0.5">
+                {sourceSite === 'extract'
+                  ? 'URL抽出した記事です。既定では非公開（ログイン中のみ閲覧可）です。'
+                  : 'オフにすると、ログインしている編集者だけが閲覧できます。'}
+              </span>
+            </span>
+          </label>
+        </div>
 
         {/* Bottom submit (mirrors the sticky header button) */}
         <div className="pt-2 flex justify-end">

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import get_current_user
+from auth import get_current_user, get_optional_user
 from database import get_db
 from models import Category, Article
 from schemas import CategoryOut, TagOut, CategoryCreate
@@ -14,16 +14,23 @@ router = APIRouter(prefix="/api/categories", tags=["categories"])
 
 
 @router.get("", response_model=list[CategoryOut])
-async def list_categories(db: AsyncSession = Depends(get_db)):
+async def list_categories(
+    db: AsyncSession = Depends(get_db),
+    viewer: str | None = Depends(get_optional_user),
+):
     cats = (await db.execute(select(Category).order_by(Category.name_en))).scalars().all()
 
     # Count articles per category in one correlated subquery.
     # Column references must be qualified: a bare `slug` inside the subquery
     # binds to articles.slug, not categories.slug, making every count 0.
+    # Guests get counts over public articles only, otherwise the sidebar
+    # numbers leak the existence of hidden articles.
+    visibility = "" if viewer else " AND articles.guest_visible = 1"
     count_rows = (await db.execute(text(
         "SELECT categories.slug,"
         " (SELECT COUNT(*) FROM articles"
-        "  WHERE articles.categories LIKE '%\"' || categories.slug || '\"%') AS cnt"
+        "  WHERE articles.categories LIKE '%\"' || categories.slug || '\"%'"
+        f"  {visibility}) AS cnt"
         " FROM categories"
     ))).fetchall()
     counts = {row[0]: row[1] for row in count_rows}

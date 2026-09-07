@@ -57,6 +57,7 @@ class ArticleCard(BaseModel):
     published_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
+    guest_visible: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -74,6 +75,7 @@ class ArticleCard(BaseModel):
 class ArticleOut(ArticleCard):
     body: str
     source_url: Optional[str]
+    source_site: Optional[str] = None
     updated_at: datetime
     ai_comment: Optional[str] = None
     ai_comment_model: Optional[str] = None
@@ -90,6 +92,11 @@ class ArticleListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class SearchResponse(BaseModel):
+    items: list[ArticleCard]
+    total: int
 
 
 class CategoryCreate(BaseModel):
