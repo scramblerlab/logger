@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { ArticleCard as ArticleCardType } from '../types';
 import { heroImageUrl } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
   article: ArticleCardType;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function ArticleCard({ article, categories, selectable, selected, onSelect, featured }: Props) {
+  const { isEditor } = useAuth();
   const imgUrl = heroImageUrl(article.slug, article.hero_image, article.updated_at);
   const cats = categories.filter((c) => article.categories.includes(c.slug));
   const date = article.published_at
@@ -34,6 +36,14 @@ export default function ArticleCard({ article, categories, selectable, selected,
         </svg>
       )}
     </div>
+  );
+
+  // Only editors ever receive non-public articles from the API, but guard
+  // anyway so the badge can never leak into a guest render.
+  const hiddenBadge = isEditor && !article.guest_visible && (
+    <span className="absolute top-2 right-2 bg-black/70 text-slate-200 text-[10px] font-semibold px-1.5 py-0.5 rounded-lg whitespace-nowrap">
+      🔒 非公開
+    </span>
   );
 
   const content = (
@@ -64,6 +74,7 @@ export default function ArticleCard({ article, categories, selectable, selected,
           <img src={imgUrl} alt={article.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : placeholder}
         {checkbox}
+        {hiddenBadge}
       </div>
       {content}
     </>
@@ -74,6 +85,7 @@ export default function ArticleCard({ article, categories, selectable, selected,
           <img src={imgUrl} alt={article.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : placeholder}
         {checkbox}
+        {hiddenBadge}
       </div>
       {content}
     </>

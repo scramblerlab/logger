@@ -24,11 +24,13 @@ export interface ArticleCard {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  guest_visible: boolean;
 }
 
 export interface Article extends ArticleCard {
   body: string;
   source_url: string | null;
+  source_site: string | null;
   updated_at: string;
   ai_comment: string | null;
   ai_comment_model: string | null;
@@ -40,6 +42,11 @@ export interface ArticleListResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface SearchResponse {
+  items: ArticleCard[];
+  total: number;
 }
 
 export interface ImportAnalyzeResponse {

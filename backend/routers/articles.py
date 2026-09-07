@@ -12,7 +12,7 @@ from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from slugify import slugify
 
-from auth import get_current_user
+from auth import get_current_user, get_optional_user
 from database import get_db, SessionLocal
 from models import Article, Tag
 from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, BulkCategorizeRequest
@@ -52,6 +52,7 @@ async def list_articles(
     limit: int = Query(20, le=100),
     sort: str = Query("published"),
     db: AsyncSession = Depends(get_db),
+    viewer: Optional[str] = Depends(get_optional_user),
 ):
     if sort == "imported":
         order = Article.created_at.desc()
@@ -59,6 +60,8 @@ async def list_articles(
         order = Article.published_at.desc()
     q = select(Article).order_by(order)
 
+    if viewer is None:
+        q = q.where(Article.guest_visible.is_(True))
     if category:
         q = q.where(Article.categories.like(f'%"{category}"%'))
     if tag:
@@ -94,10 +97,17 @@ async def ai_comment_bulk_status():
 
 
 @router.get("/{slug}", response_model=ArticleOut)
-async def get_article(slug: str, db: AsyncSession = Depends(get_db)):
+async def get_article(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    viewer: Optional[str] = Depends(get_optional_user),
+):
     result = await db.execute(select(Article).where(Article.slug == slug))
     article = result.scalar_one_or_none()
     if not article:
+        raise HTTPException(404, "Article not found")
+    if viewer is None and not article.guest_visible:
+        # 404 rather than 403 so a hidden article's existence stays private
         raise HTTPException(404, "Article not found")
     return ArticleOut.model_validate(article)
 
@@ -110,6 +120,8 @@ async def create_article(
     tags: str = Form("[]"),
     published_at: Optional[str] = Form(None),
     source_url: Optional[str] = Form(None),
+    source_site: Optional[str] = Form(None),
+    guest_visible: bool = Form(True),
     hero_image: Optional[UploadFile] = File(None),
     additional_images: list[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
@@ -151,6 +163,8 @@ async def create_article(
         tags=json.dumps(tag_list, ensure_ascii=False),
         published_at=pub_dt,
         source_url=source_url,
+        source_site=source_site,
+        guest_visible=guest_visible,
         data_path=f"articles/{slug}",
     )
     db.add(article)
@@ -167,6 +181,8 @@ async def create_article(
         "categories": cats,
         "tags": tag_list,
         "publishedAt": pub_dt.isoformat(),
+        "sourceSite": source_site,
+        "guestVisible": guest_visible,
     })
 
     await _upsert_tags(db, tag_list)
@@ -288,6 +304,7 @@ async def update_article(
     tags: Optional[str] = Form(None),
     published_at: Optional[str] = Form(None),
     ai_comment: Optional[str] = Form(None),
+    guest_visible: Optional[bool] = Form(None),
     remove_image_paths: str = Form("[]"),
     reuse_image_as_hero: Optional[str] = Form(None),
     hero_image: Optional[UploadFile] = File(None),
@@ -320,6 +337,8 @@ async def update_article(
             pass
     if ai_comment is not None:
         article.ai_comment = ai_comment
+    if guest_visible is not None:
+        article.guest_visible = guest_visible
 
     # Remove requested images from disk (rel_path values match article.json additionalImages entries)
     from pathlib import Path
@@ -374,6 +393,8 @@ async def update_article(
             art_json["publishedAt"] = article.published_at.isoformat() if article.published_at else None
         if ai_comment is not None:
             art_json["ai_comment"] = ai_comment
+        if guest_visible is not None:
+            art_json["guestVisible"] = guest_visible
         art_json["additionalImages"] = all_extras
         storage.write_article_json(slug, art_json)
 
@@ -390,14 +411,32 @@ async def upload_article_image(
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
+    import time
+    started = time.monotonic()
+    filename = image.filename or "image.jpg"
+
     result = await db.execute(select(Article).where(Article.slug == slug))
     if not result.scalar_one_or_none():
+        logger.warning("image upload rejected: article %s not found (%s)", slug, filename)
         raise HTTPException(404, "Article not found")
+
     data = await image.read()
-    rel = await storage.save_upload(slug, data, image.filename or "image.jpg")
+    logger.info("image upload start: slug=%s file=%s bytes=%d", slug, filename, len(data))
+    try:
+        rel = await storage.save_upload(slug, data, filename)
+    except Exception as exc:
+        # Previously any Pillow failure surfaced as an opaque 500 with no log,
+        # and the editor silently dropped the image block.
+        logger.exception("image upload failed: slug=%s file=%s", slug, filename)
+        raise HTTPException(500, f"Image processing failed: {exc}")
+
     art_json = storage.read_article_json(slug) or {}
     art_json.setdefault("additionalImages", []).append(rel)
     storage.write_article_json(slug, art_json)
+    logger.info(
+        "image upload done: slug=%s file=%s rel=%s elapsed=%.2fs",
+        slug, filename, rel, time.monotonic() - started,
+    )
     return {"rel_path": rel}
 
 

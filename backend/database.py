@@ -126,6 +126,16 @@ async def init_db():
             """))
             await conn.execute(text("PRAGMA user_version = 5"))
 
+        if version < 6:
+            # Guest visibility flag. No backfill: every existing article stays
+            # public. URL-extracted articles predating this column are flipped
+            # by hand from the editor (the origin was never recorded, so they
+            # cannot be told apart from WordPress/Shopify imports).
+            await conn.execute(text(
+                "ALTER TABLE articles ADD COLUMN guest_visible BOOLEAN NOT NULL DEFAULT 1"
+            ))
+            await conn.execute(text("PRAGMA user_version = 6"))
+
     # Seed categories
     async with SessionLocal() as session:
         from sqlalchemy import select

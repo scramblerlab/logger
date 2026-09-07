@@ -8,10 +8,12 @@ import CategoryEditModal from '../components/CategoryEditModal';
 import BulkCategoryPanel from '../components/BulkCategoryPanel';
 import ShopifyExportDialog from '../components/ShopifyExportDialog';
 import ShopifyExportPanel from '../components/ShopifyExportPanel';
+import BulkActionsModal from '../components/BulkActionsModal';
+import CategoryPickerModal from '../components/CategoryPickerModal';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
 import { useTranslation } from '../context/TranslationContext';
-import { usePushNotification } from '../hooks/usePushNotification';
+import { useSearchResults } from '../context/SearchContext';
 import LoginModal from '../components/LoginModal';
 
 const PAGE_SIZE = 18;
@@ -25,7 +27,10 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [searchResults, setSearchResults] = useState<ArticleCardType[] | null>(null);
+  const [searchHits, setSearchHits] = useState<number | null>(null);
   const [showCategoryEdit, setShowCategoryEdit] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showBulkActions, setShowBulkActions] = useState(false);
   const [heroArticle, setHeroArticle] = useState<ArticleCardType | null>(null);
   const [allCount, setAllCount] = useState(0);
   const [translatedTitles, setTranslatedTitles] = useState<Map<string, string> | null>(null);
@@ -51,9 +56,9 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor, logout } = useAuth();
-  const { setOnComplete, status: aiStatus, progress: aiProgress, startJob, commentStatus, commentProgress, startCommentJob } = useAiJob();
+  const { setOnComplete } = useAiJob();
   const { registerHandlers } = useTranslation();
-  const { supported: pushSupported, permission: pushPermission, subscribed: pushSubscribed, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotification();
+  const { setHitCount } = useSearchResults();
 
   useEffect(() => {
     api.articles.list({ page: 1, limit: 1, sort: 'published' }).then((data) => {
@@ -110,12 +115,19 @@ export default function Home() {
 
   useEffect(() => {
     if (searchQuery) {
-      api.search.query(searchQuery).then(setSearchResults).catch(() => setSearchResults([]));
+      api.search.query(searchQuery)
+        .then((res) => { setSearchResults(res.items); setSearchHits(res.total); setHitCount(res.total); })
+        .catch(() => { setSearchResults([]); setSearchHits(0); setHitCount(0); });
     } else {
       setSearchResults(null);
+      setSearchHits(null);
+      setHitCount(null);
       loadArticles(true);
     }
-  }, [activeCategory, activeTag, searchQuery, sort]);
+  }, [activeCategory, activeTag, searchQuery, sort, setHitCount]);
+
+  // Clear the header badge when leaving the list entirely.
+  useEffect(() => () => setHitCount(null), [setHitCount]);
 
   useEffect(() => {
     setOnComplete(() => {
@@ -200,6 +212,22 @@ export default function Home() {
     setSearchParams(next);
   };
 
+  // Toolbar label: which slice is showing, and how many articles are in it.
+  const activeCat = categories.find((c) => c.slug === activeCategory);
+  const activeCategoryLabel = activeTag
+    ? `#${activeTag}`
+    : activeCat
+      ? `${translatedLabels?.category ?? 'カテゴリー'}: ${translatedCategoryLabels?.get(activeCat.slug) ?? activeCat.name_ja}`
+      : `${translatedLabels?.category ?? 'カテゴリー'}: ${translatedLabels?.all ?? 'すべて'}`;
+
+  // `total` is the server-side count for the active category/tag filter, so it
+  // stays correct for tags too — unlike category.article_count.
+  const countLabel = searchQuery
+    ? `${searchHits ?? displayedArticles.length}件`
+    : activeCategory || activeTag
+      ? `${total}件 / 全${allCount}件`
+      : `${allCount}件`;
+
   const handleSelectTag = (tag: string) => {
     const next = new URLSearchParams(searchParams);
     next.set('tag', tag);
@@ -224,74 +252,40 @@ export default function Home() {
       </div>
     )}
     <div className={`max-w-7xl mx-auto px-4 py-8 ${bulkMode || exportMode ? 'pb-28' : ''}`}>
-      {/* Mobile: action buttons (editor only) */}
-      {isEditor && (
-        <div className="flex flex-wrap gap-2 mb-3 lg:hidden">
-          <button
-            onClick={startJob}
-            disabled={aiStatus === 'running'}
-            className="btn btn-solid disabled:opacity-50"
-          >
-            {aiStatus === 'running' ? '⏳ AI中...' : 'AI分類'}
+      {/* Primary toolbar — category picker, bulk actions, sort, auth */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <button onClick={() => setShowCategoryPicker(true)} className="btn btn-outline">
+          {activeCategoryLabel}
+          <span className="ml-2 text-xs text-slate-500 tabular-nums">
+            {countLabel}
+          </span>
+        </button>
+        {isEditor && (
+          <button onClick={() => setShowBulkActions(true)} className="btn btn-outline">
+            バルク操作
           </button>
-          <button
-            onClick={startCommentJob}
-            disabled={commentStatus === 'running'}
-            className="btn btn-solid disabled:opacity-50"
-          >
-            {commentStatus === 'running' ? '⏳ AIコメント中...' : 'AIコメント追加'}
-          </button>
-          <button
-            onClick={() => setShowCategoryEdit(true)}
-            className="btn btn-outline"
-          >
-            カテゴリー編集
-          </button>
-        </div>
-      )}
-      {isEditor && (aiStatus !== 'idle' || commentStatus !== 'idle') && (
-        <div className="lg:hidden mb-2 space-y-0.5">
-          {aiStatus !== 'idle' && aiProgress && <p className="text-xs text-amber-400">{aiProgress}</p>}
-          {commentStatus !== 'idle' && commentProgress && <p className="text-xs text-amber-400">{commentProgress}</p>}
-        </div>
-      )}
-
-      {/* Mobile: category tabs + auth */}
-      <div className="lg:hidden mb-6">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => handleSelectCategory(null)}
-            className={`btn ${!activeCategory ? 'btn-solid' : 'btn-outline'}`}
-          >
-            {translatedLabels?.all ?? 'All'}
-          </button>
-          {categories.map((c) => (
+        )}
+        {!searchQuery && (
+          <>
             <button
-              key={c.slug}
-              onClick={() => handleSelectCategory(c.slug)}
-              className={`btn ${activeCategory === c.slug ? 'text-white' : 'btn-outline'}`}
-              style={activeCategory === c.slug ? { backgroundColor: c.color } : {}}
+              onClick={() => handleSetSort('published')}
+              className={`btn ${sort === 'published' ? 'btn-solid' : 'btn-outline'}`}
             >
-              {translatedCategoryLabels?.get(c.slug) ?? c.name_ja}
+              新着順
             </button>
-          ))}
-        </div>
-        <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={() => handleSetSort('imported')}
+              className={`btn ${sort === 'imported' ? 'btn-solid' : 'btn-outline'}`}
+            >
+              インポート順
+            </button>
+          </>
+        )}
+        <div className="ml-auto">
           {isEditor ? (
             <button onClick={() => logout()} className="btn btn-solid">ログアウト</button>
           ) : (
             <button onClick={() => setShowLogin(true)} className="btn btn-solid">ログイン</button>
-          )}
-          {isEditor && pushSupported && pushPermission !== 'denied' && (
-            <button
-              onClick={pushSubscribed ? pushUnsubscribe : pushSubscribe}
-              disabled={pushLoading}
-              className="flex items-center gap-1.5 text-sm disabled:opacity-50 transition-colors"
-              style={{ color: pushSubscribed ? '#f59e0b' : '#94a3b8' }}
-            >
-              <span>{pushSubscribed ? '🔔' : '🔕'}</span>
-              <span>{pushLoading ? '...' : pushSubscribed ? 'AI通知 ON' : 'AI通知 OFF'}</span>
-            </button>
           )}
         </div>
       </div>
@@ -299,39 +293,21 @@ export default function Home() {
       <div className="flex gap-8">
         <div className="hidden lg:block">
           <Sidebar
-            categories={categories} tags={tags}
-            allCount={allCount}
-            activeCategory={activeCategory}
-            onSelectCategory={handleSelectCategory}
+            tags={tags}
             onSelectTag={handleSelectTag}
-            onOpenCategoryEdit={() => setShowCategoryEdit(true)}
-            onBulkCategorize={enterBulkMode}
-            onShopifyExport={enterExportMode}
-            categoryLabels={translatedCategoryLabels ?? undefined}
             labels={translatedLabels ?? undefined}
           />
         </div>
 
         <main className="flex-1 min-w-0">
-          {!searchQuery && (
-            <div className="flex items-center gap-1.5 mb-4">
-              <button
-                onClick={() => handleSetSort('published')}
-                className={`btn ${sort === 'published' ? 'btn-solid' : 'btn-outline'}`}
-              >
-                新着順
-              </button>
-              <button
-                onClick={() => handleSetSort('imported')}
-                className={`btn ${sort === 'imported' ? 'btn-solid' : 'btn-outline'}`}
-              >
-                インポート順
-              </button>
-            </div>
-          )}
           {searchQuery && (
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm text-slate-400">「{searchQuery}」の検索結果: {displayedArticles.length}件</p>
+              <p className="text-sm text-slate-400">
+                「{searchQuery}」の検索結果: {searchHits ?? displayedArticles.length}件
+                {searchHits !== null && searchHits > displayedArticles.length && (
+                  <span className="text-slate-500">（上位{displayedArticles.length}件を表示）</span>
+                )}
+              </p>
               <button onClick={() => setSearchParams({})} className="text-sm text-amber-400 hover:text-amber-300 transition-colors">クリア</button>
             </div>
           )}
@@ -392,6 +368,27 @@ export default function Home() {
           onClearSelection={() => setSelectedIds(new Set())}
           onUpdate={handleBulkUpdate}
           onCancel={exitBulkMode}
+        />
+      )}
+
+      {showCategoryPicker && (
+        <CategoryPickerModal
+          categories={categories}
+          activeCategory={activeCategory}
+          allCount={allCount}
+          onSelectCategory={handleSelectCategory}
+          onOpenCategoryEdit={() => setShowCategoryEdit(true)}
+          onClose={() => setShowCategoryPicker(false)}
+          categoryLabels={translatedCategoryLabels ?? undefined}
+          labels={translatedLabels ?? undefined}
+        />
+      )}
+
+      {showBulkActions && (
+        <BulkActionsModal
+          onClose={() => setShowBulkActions(false)}
+          onBulkCategorize={enterBulkMode}
+          onShopifyExport={enterExportMode}
         />
       )}
 

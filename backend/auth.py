@@ -58,6 +58,20 @@ async def get_current_user(request: Request) -> str:
     return verify_token(token)
 
 
+async def get_optional_user(request: Request) -> str | None:
+    """Like get_current_user but returns None for guests instead of raising.
+
+    Used by public endpoints that show more to a signed-in editor.
+    """
+    token = request.cookies.get("auth_token")
+    if not token:
+        return None
+    try:
+        return verify_token(token)
+    except HTTPException:
+        return None
+
+
 import logging as _logging
 _log = _logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, DateTime, Integer
+from sqlalchemy import String, Text, DateTime, Integer, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from database import Base
 
@@ -21,7 +21,8 @@ class Article(Base):
     tags: Mapped[str] = mapped_column(Text, default="[]")          # JSON array string
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_url: Mapped[str | None] = mapped_column(String)
-    source_site: Mapped[str | None] = mapped_column(String)
+    source_site: Mapped[str | None] = mapped_column(String)   # "extract" | "wordpress" | "shopify" | None
+    guest_visible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     data_path: Mapped[str | None] = mapped_column(String)
     ai_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_comment_model: Mapped[str | None] = mapped_column(Text, nullable=True)

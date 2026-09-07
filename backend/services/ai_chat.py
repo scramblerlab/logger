@@ -20,12 +20,17 @@ SYSTEM_PROMPT = """You are a helpful assistant for a personal Japanese lifestyle
 Respond in the same language the user writes in (Japanese or English)."""
 
 
-async def _get_site_stats(db: AsyncSession) -> dict:
-    total_row = await db.execute(text("SELECT COUNT(*) FROM articles"))
+async def _get_site_stats(db: AsyncSession, include_hidden: bool = False) -> dict:
+    # Guests must not see counts, dates or titles of non-public articles.
+    where = "" if include_hidden else " WHERE guest_visible = 1"
+    and_where = "" if include_hidden else " AND guest_visible = 1"
+
+    total_row = await db.execute(text(f"SELECT COUNT(*) FROM articles{where}"))
     total = total_row.scalar() or 0
 
     date_row = await db.execute(text(
-        "SELECT MIN(published_at), MAX(published_at) FROM articles WHERE published_at IS NOT NULL"
+        "SELECT MIN(published_at), MAX(published_at) FROM articles"
+        f" WHERE published_at IS NOT NULL{and_where}"
     ))
     date_range = date_row.fetchone()
     oldest = (date_range[0] or "")[:10]
@@ -42,7 +47,7 @@ async def _get_site_stats(db: AsyncSession) -> dict:
     tags = [{"name": r[0], "count": r[1]} for r in tag_rows.fetchall()]
 
     recent_rows = await db.execute(text(
-        "SELECT title, slug FROM articles ORDER BY published_at DESC LIMIT 5"
+        f"SELECT title, slug FROM articles{where} ORDER BY published_at DESC LIMIT 5"
     ))
     recent = [{"title": r[0], "slug": r[1]} for r in recent_rows.fetchall()]
 
@@ -80,25 +85,27 @@ def _format_site_stats(stats: dict) -> str:
     return "\n".join(lines)
 
 
-async def _search_db(question: str, db: AsyncSession, limit: int = 5) -> dict:
+async def _search_db(question: str, db: AsyncSession, limit: int = 5,
+                     include_hidden: bool = False) -> dict:
     try:
         fts_q = tokenize_ja(question)
+        visibility = "" if include_hidden else " AND a.guest_visible = 1"
         count_row = await db.execute(
-            text("""
+            text(f"""
                 SELECT COUNT(*) FROM articles a
                 JOIN articles_fts fts ON a.rowid = fts.rowid
-                WHERE articles_fts MATCH :q
+                WHERE articles_fts MATCH :q{visibility}
             """),
             {"q": fts_q},
         )
         total = count_row.scalar() or 0
 
         result = await db.execute(
-            text("""
+            text(f"""
                 SELECT a.slug, a.title, a.body
                 FROM articles a
                 JOIN articles_fts fts ON a.rowid = fts.rowid
-                WHERE articles_fts MATCH :q
+                WHERE articles_fts MATCH :q{visibility}
                 ORDER BY rank
                 LIMIT :limit
             """),
@@ -139,10 +146,10 @@ def _build_context(stats_text: str, db_result: dict, web_results: list[dict]) ->
     return "\n".join(parts)
 
 
-async def ask_ai(question: str, db: AsyncSession) -> dict:
+async def ask_ai(question: str, db: AsyncSession, include_hidden: bool = False) -> dict:
     stats, db_result, web_results = await asyncio.gather(
-        _get_site_stats(db),
-        _search_db(question, db),
+        _get_site_stats(db, include_hidden=include_hidden),
+        _search_db(question, db, include_hidden=include_hidden),
         _web_search(question),
     )
 

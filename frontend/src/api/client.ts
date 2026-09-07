@@ -1,4 +1,4 @@
-import type { Article, ArticleCard, ArticleListResponse, Category, CategoryCreate, Tag, ImportAnalyzeResponse, ShopifyBlogsResponse } from '../types';
+import type { Article, ArticleListResponse, SearchResponse, Category, CategoryCreate, Tag, ImportAnalyzeResponse, ShopifyBlogsResponse } from '../types';
 
 const BASE = '/api';
 
@@ -61,7 +61,7 @@ export const api = {
       fetch(`${BASE}/categories/${slug}`, { method: 'DELETE' }).then(() => {}),
   },
   search: {
-    query: (q: string): Promise<ArticleCard[]> =>
+    query: (q: string): Promise<SearchResponse> =>
       request(`/search?q=${encodeURIComponent(q)}`),
   },
   importer: {
