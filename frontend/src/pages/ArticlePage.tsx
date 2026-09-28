@@ -65,8 +65,15 @@ export default function ArticlePage() {
 
   const handleDelete = async () => {
     if (!confirm('この記事を削除しますか？')) return;
-    await api.articles.delete(article.slug);
-    navigate('/');
+    try {
+      await api.articles.delete(article.slug);
+    } catch (err) {
+      alert(`削除に失敗しました（${err instanceof Error ? err.message : String(err)}）`);
+      return;
+    }
+    alert('記事を削除しました');
+    // replace: the back button must not return to the deleted article.
+    navigate('/', { replace: true });
   };
 
   const handleShare = async () => {
