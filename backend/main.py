@@ -141,5 +141,8 @@ async def health():
 @app.get("/{full_path:path}")
 async def spa_fallback(full_path: str):
     if FRONTEND_DIST.exists():
-        return FileResponse(FRONTEND_DIST / "index.html")
+        # index.html points at hashed bundles, so it must be revalidated every
+        # load — otherwise a cached copy (notably in installed PWAs) keeps
+        # running the previous build after a deploy.
+        return FileResponse(FRONTEND_DIST / "index.html", headers={"Cache-Control": "no-cache"})
     return {"detail": "Not Found"}

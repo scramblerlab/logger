@@ -9,6 +9,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const detail = await res.json().then(j => j?.detail, () => null);
     throw new Error(`${res.status} ${res.statusText}${typeof detail === 'string' ? `: ${detail}` : ''}`);
   }
+  // DELETE returns 204 with no body; res.json() would throw and make a
+  // successful call look like a failure.
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
