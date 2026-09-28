@@ -32,6 +32,15 @@ CATEGORIES_SEED = [
 ]
 
 
+async def _add_column_if_missing(conn, table: str, column: str, ddl: str):
+    # On a fresh DB, create_all() already builds tables from the current models,
+    # so ALTER-based migrations must skip columns that are already there.
+    from sqlalchemy import text
+    cols = {row[1] for row in (await conn.execute(text(f"PRAGMA table_info({table})"))).fetchall()}
+    if column not in cols:
+        await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+
+
 async def init_db():
     import os as _os
     _os.makedirs(DATA_DIR, exist_ok=True)
@@ -61,8 +70,8 @@ async def init_db():
             await conn.execute(text("PRAGMA user_version = 1"))
 
         if version < 2:
-            await conn.execute(text("ALTER TABLE articles ADD COLUMN ai_comment TEXT"))
-            await conn.execute(text("ALTER TABLE articles ADD COLUMN ai_comment_model TEXT"))
+            await _add_column_if_missing(conn, "articles", "ai_comment", "TEXT")
+            await _add_column_if_missing(conn, "articles", "ai_comment_model", "TEXT")
             await conn.execute(text("PRAGMA user_version = 2"))
 
         if version < 3:
@@ -131,9 +140,9 @@ async def init_db():
             # public. URL-extracted articles predating this column are flipped
             # by hand from the editor (the origin was never recorded, so they
             # cannot be told apart from WordPress/Shopify imports).
-            await conn.execute(text(
-                "ALTER TABLE articles ADD COLUMN guest_visible BOOLEAN NOT NULL DEFAULT 1"
-            ))
+            await _add_column_if_missing(
+                conn, "articles", "guest_visible", "BOOLEAN NOT NULL DEFAULT 1"
+            )
             await conn.execute(text("PRAGMA user_version = 6"))
 
     # Seed categories

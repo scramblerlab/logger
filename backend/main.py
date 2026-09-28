@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -57,6 +58,32 @@ async def _log_shared_origin(request, call_next):
             request.headers.get("origin", "(none)"),
         )
     return await call_next(request)
+
+
+@app.middleware("http")
+async def _log_article_writes(request, call_next):
+    # Debug aid for per-device posting failures (Android vs iOS): shows whether
+    # the request arrived at all, its size, whether the auth cookie came along,
+    # and how it ended — including exceptions that never reach a handler log.
+    if request.method == "GET" or not request.url.path.startswith("/api/articles"):
+        return await call_next(request)
+    log = logging.getLogger("article_debug")
+    started = time.monotonic()
+    log.info(
+        "→ %s %s len=%s ctype=%s cookie=%s ua=%s",
+        request.method, request.url.path,
+        request.headers.get("content-length", "?"),
+        request.headers.get("content-type", "?").split(";")[0],
+        "auth_token" in request.cookies,
+        request.headers.get("user-agent", "?")[:160],
+    )
+    try:
+        response = await call_next(request)
+    except Exception:
+        log.exception("✗ %s %s crashed after %.2fs", request.method, request.url.path, time.monotonic() - started)
+        raise
+    log.info("← %s %s status=%d %.2fs", request.method, request.url.path, response.status_code, time.monotonic() - started)
+    return response
 
 articles_static = os.path.join(DATA_DIR, "articles")
 os.makedirs(articles_static, exist_ok=True)

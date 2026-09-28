@@ -4,7 +4,11 @@ const BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { credentials: 'include', ...options });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    // Surface FastAPI's `detail` — on mobile there is no console to read it from.
+    const detail = await res.json().then(j => j?.detail, () => null);
+    throw new Error(`${res.status} ${res.statusText}${typeof detail === 'string' ? `: ${detail}` : ''}`);
+  }
   return res.json();
 }
 
