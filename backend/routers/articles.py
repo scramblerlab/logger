@@ -112,6 +112,20 @@ async def get_article(
     return ArticleOut.model_validate(article)
 
 
+async def _save_uploaded_image(slug: str, upload: UploadFile, is_hero: bool = False) -> str:
+    """Read + optimize one multipart image, logging enough to debug per-device failures."""
+    data = await upload.read()
+    logger.info(
+        "save image: slug=%s hero=%s file=%r content_type=%s bytes=%d head=%s",
+        slug, is_hero, upload.filename, upload.content_type, len(data), data[:12].hex(),
+    )
+    try:
+        return await storage.save_upload(slug, data, upload.filename or "image.jpg", is_hero=is_hero)
+    except Exception as exc:
+        logger.exception("save image failed: slug=%s hero=%s file=%r", slug, is_hero, upload.filename)
+        raise HTTPException(422, f"画像を処理できませんでした ({upload.filename}, {upload.content_type}): {exc}")
+
+
 @router.post("", response_model=ArticleOut, status_code=201)
 async def create_article(
     title: str = Form(...),
@@ -133,17 +147,19 @@ async def create_article(
     date_prefix = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     slug = f"{date_prefix}-{slugify(title, max_length=50, separator='-')}-{uuid.uuid4().hex[:4]}"
 
+    logger.info(
+        "create article: slug=%s title=%r body_len=%d hero=%s extras=%d",
+        slug, title, len(body), bool(hero_image and hero_image.filename), len(additional_images),
+    )
+
     hero_rel = None
     if hero_image and hero_image.filename:
-        data = await hero_image.read()
-        hero_rel = await storage.save_upload(slug, data, hero_image.filename, is_hero=True)
+        hero_rel = await _save_uploaded_image(slug, hero_image, is_hero=True)
 
     extra_rels = []
     for img in additional_images:
         if img and img.filename:
-            data = await img.read()
-            rel = await storage.save_upload(slug, data, img.filename)
-            extra_rels.append(rel)
+            extra_rels.append(await _save_uploaded_image(slug, img))
 
     pub_dt = None
     if published_at:
@@ -312,9 +328,15 @@ async def update_article(
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
+    logger.info(
+        "update article: slug=%s body_len=%s hero=%s extras=%d reuse_hero=%s",
+        slug, None if body is None else len(body),
+        bool(hero_image and hero_image.filename), len(additional_images), reuse_image_as_hero,
+    )
     result = await db.execute(select(Article).where(Article.slug == slug))
     article = result.scalar_one_or_none()
     if not article:
+        logger.warning("update rejected: article %s not found", slug)
         raise HTTPException(404, "Article not found")
 
     from models import now_utc
@@ -352,8 +374,7 @@ async def update_article(
 
     # Replace hero image (uploaded file takes precedence over reuse path)
     if hero_image and hero_image.filename:
-        data = await hero_image.read()
-        hero_rel = await storage.save_upload(slug, data, hero_image.filename, is_hero=True)
+        hero_rel = await _save_uploaded_image(slug, hero_image, is_hero=True)
         article.hero_image = hero_rel
     elif reuse_image_as_hero:
         hero_rel = storage.copy_image_as_hero(slug, reuse_image_as_hero)
@@ -371,9 +392,7 @@ async def update_article(
     new_extras = []
     for img in additional_images:
         if img and img.filename:
-            data = await img.read()
-            rel = await storage.save_upload(slug, data, img.filename)
-            new_extras.append(rel)
+            new_extras.append(await _save_uploaded_image(slug, img))
 
     all_extras = existing_extras + new_extras
 
@@ -421,7 +440,10 @@ async def upload_article_image(
         raise HTTPException(404, "Article not found")
 
     data = await image.read()
-    logger.info("image upload start: slug=%s file=%s bytes=%d", slug, filename, len(data))
+    logger.info(
+        "image upload start: slug=%s file=%r content_type=%s bytes=%d head=%s",
+        slug, filename, image.content_type, len(data), data[:12].hex(),
+    )
     try:
         rel = await storage.save_upload(slug, data, filename)
     except Exception as exc:

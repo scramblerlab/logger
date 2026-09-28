@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,10 +12,23 @@ from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
 
+# Android Chrome uploads the original bytes (HEIC on many Samsung/Pixel
+# setups), whereas iOS Safari transcodes to JPEG before upload. Without this
+# Pillow raises "cannot identify image file" and the whole post fails.
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    logger.warning("pillow-heif not installed: HEIC/HEIF uploads will fail")
+
 DATA_DIR = os.getenv("DATA_DIR", "./data")
 ARTICLES_DIR = os.path.join(DATA_DIR, "articles")
 MAX_IMAGE_DIMENSION = 2048
 JPEG_QUALITY = 85
+
+# Pillow refuses anything over ~179MP as a decompression bomb, but Samsung's
+# 200MP camera mode produces ~200MP JPEGs. Uploads are auth-only, so allow it.
+Image.MAX_IMAGE_PIXELS = 300_000_000
 
 
 def _article_dir(slug: str) -> Path:
@@ -33,7 +47,7 @@ async def save_upload(slug: str, data: bytes, filename: str, is_hero: bool = Fal
     else:
         images_dir = art_dir / "images"
         images_dir.mkdir(parents=True, exist_ok=True)
-        name = f"{uuid.uuid4().hex[:8]}_{filename}"
+        name = f"{uuid.uuid4().hex[:8]}_{_safe_stem(filename)}.jpg"
         dest = images_dir / name
         rel = f"images/{name}"
 
@@ -42,9 +56,26 @@ async def save_upload(slug: str, data: bytes, filename: str, is_hero: bool = Fal
     return rel
 
 
+def _safe_stem(filename: str) -> str:
+    # The name ends up inside markdown `![](images/...)`: spaces or parens
+    # (e.g. Android "Screenshot (1).png") break the link. Output is always
+    # JPEG, so the original extension is dropped too.
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_")[:60]
+    return stem or "image"
+
+
 def _write_and_optimize(data: bytes, dest: Path):
     import io
     img = Image.open(io.BytesIO(data))
+    logger.info(
+        "decoded image for %s: format=%s mode=%s size=%s bytes=%d",
+        dest.name, img.format, img.mode, img.size, len(data),
+    )
+    # Let libjpeg decode at 1/2–1/8 scale when the result still exceeds the
+    # target, so huge phone photos don't need hundreds of MB of RAM.
+    if img.format == "JPEG":
+        img.draft("RGB", (MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION))
 
     # Phone cameras store portrait shots as landscape pixels plus an EXIF
     # Orientation tag. JPEG output here drops EXIF, so without baking the

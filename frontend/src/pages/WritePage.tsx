@@ -91,7 +91,9 @@ async function uploadImageToSlug(slug: string, file: File): Promise<UploadResult
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       console.error('[upload] http error', { slug, name: file.name, status: res.status, elapsed, body });
-      return { ok: false, reason: 'http', detail: `${res.status} ${res.statusText}` };
+      let detail = '';
+      try { const j = JSON.parse(body); if (typeof j?.detail === 'string') detail = `: ${j.detail}`; } catch { /* non-JSON body */ }
+      return { ok: false, reason: 'http', detail: `${res.status} ${res.statusText}${detail}` };
     }
     const relPath = (await res.json()).rel_path as string;
     console.info('[upload] done', { slug, name: file.name, relPath, elapsed });
