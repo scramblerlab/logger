@@ -142,6 +142,9 @@ export default function WritePage() {
   const [commenting, setCommenting] = useState(false);
   const [commentMsg, setCommentMsg] = useState('');
   const [currentComment, setCurrentComment] = useState<string | null>(null);
+  const [currentCommentModel, setCurrentCommentModel] = useState<string | null>(null);
+  // New-post "AI分析" runs classify then comment in sequence; this names the running step.
+  const [analyzeStep, setAnalyzeStep] = useState<'classify' | 'comment' | null>(null);
   const [postResult, setPostResult] = useState<
     { slug: string; bodySizeBytes: number; blockCount: number; publishedAt?: string } | null
   >(null);
@@ -230,9 +233,8 @@ export default function WritePage() {
   const toggleCat = (slug: string) =>
     setSelectedCats(p => p.includes(slug) ? p.filter(s => s !== slug) : [...p, slug]);
 
-  const handleAiClassify = async () => {
-    if (!title) return;
-    setClassifying(true); setClassifyMsg('');
+  const runClassify = async () => {
+    setClassifyMsg('');
     try {
       const { job_id } = await api.articles.aiClassify(title, serializeBlocks(blocks));
       const result = await pollJob(() => api.articles.aiClassifyStatus(job_id));
@@ -248,7 +250,38 @@ export default function WritePage() {
       // collapsing every failure into a generic message.
       setClassifyMsg(err instanceof Error ? `エラー: ${err.message}` : 'エラーが発生しました');
     }
+  };
+
+  const handleAiClassify = async () => {
+    if (!title) return;
+    setClassifying(true);
+    try { await runClassify(); }
     finally { setClassifying(false); }
+  };
+
+  // New post only: the article has no slug yet, so the comment comes from the
+  // preview endpoint and is saved together with the create request.
+  const handleAiAnalyze = async () => {
+    if (!title) return;
+    setClassifying(true); setCommenting(true); setCommentMsg('');
+    try {
+      // Sequential on purpose — a local Ollama would queue parallel requests anyway.
+      // A classify failure is shown in classifyMsg and does not stop the comment step.
+      setAnalyzeStep('classify');
+      await runClassify();
+      setAnalyzeStep('comment');
+      try {
+        const { job_id } = await api.articles.aiCommentPreview(title, serializeBlocks(blocks));
+        const result = await pollJob(() => api.articles.aiCommentPreviewStatus(job_id));
+        setCurrentComment(result.ai_comment);
+        setCurrentCommentModel(result.ai_comment_model);
+        setCommentMsg(`生成完了 (${result.ai_comment_model})`);
+      } catch (err) {
+        setCommentMsg(err instanceof Error ? `エラー: ${err.message}` : 'エラーが発生しました');
+      }
+    } finally {
+      setAnalyzeStep(null); setClassifying(false); setCommenting(false);
+    }
   };
 
   const handleAiComment = async () => {
@@ -400,6 +433,10 @@ export default function WritePage() {
       } else {
         if (sourceUrl) form.append('source_url', sourceUrl);
         if (sourceSite) form.append('source_site', sourceSite);
+        if (currentComment) {
+          form.append('ai_comment', currentComment);
+          if (currentCommentModel) form.append('ai_comment_model', currentCommentModel);
+        }
         if (rotatedHero) form.append('hero_image', rotatedHero);
 
         // Collect pending image files from blocks (new mode two-pass)
@@ -474,7 +511,7 @@ export default function WritePage() {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || !title.trim()}
+            disabled={submitting || analyzeStep !== null || !title.trim()}
             className="btn btn-solid disabled:opacity-50 min-w-[7rem] text-left"
           >
             {submitting ? (submitStatus ?? '準備中...') : editSlug ? '更新する' : '投稿する'}
@@ -577,14 +614,27 @@ export default function WritePage() {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <label className="text-sm font-medium text-slate-400">カテゴリー</label>
-            <button
-              type="button"
-              onClick={handleAiClassify}
-              disabled={classifying || !title}
-              className="btn btn-solid disabled:opacity-40"
-            >
-              {classifying ? '⏳ AIカテゴリー分析中...' : '✦ AIカテゴリー分析'}
-            </button>
+            {editSlug ? (
+              <button
+                type="button"
+                onClick={handleAiClassify}
+                disabled={classifying || !title}
+                className="btn btn-solid disabled:opacity-40"
+              >
+                {classifying ? '⏳ AIカテゴリー分析中...' : '✦ AIカテゴリー分析'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAiAnalyze}
+                disabled={analyzeStep !== null || !title}
+                className="btn btn-solid disabled:opacity-40"
+              >
+                {analyzeStep === 'classify' ? '⏳ カテゴリー分析中... (1/2)'
+                  : analyzeStep === 'comment' ? '⏳ AIコメント作成中... (2/2)'
+                  : '✦ AI分析'}
+              </button>
+            )}
             {classifyMsg && (
               <span className={`text-xs ${classifyMsg.includes('エラー') || classifyMsg.includes('できません') ? 'text-red-400' : 'text-amber-400'}`}>
                 {classifyMsg}
@@ -608,18 +658,22 @@ export default function WritePage() {
         </div>
 
         {/* AI comment — its own feature block, below the category group */}
-        {editSlug && (
+        {(editSlug || currentComment || commentMsg || analyzeStep === 'comment') && (
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium text-slate-400">AIコメント</label>
-              <button
-                type="button"
-                onClick={handleAiComment}
-                disabled={commenting}
-                className="btn btn-solid disabled:opacity-40"
-              >
-                {commenting ? '⏳ AIコメント生成中...' : '✦ AIコメント'}
-              </button>
+              {editSlug ? (
+                <button
+                  type="button"
+                  onClick={handleAiComment}
+                  disabled={commenting}
+                  className="btn btn-solid disabled:opacity-40"
+                >
+                  {commenting ? '⏳ AIコメント生成中...' : '✦ AIコメント'}
+                </button>
+              ) : analyzeStep === 'comment' && (
+                <span className="text-xs text-amber-400">⏳ 作成中...</span>
+              )}
               {commentMsg && (
                 <span className={`text-xs ${commentMsg.includes('エラー') ? 'text-red-400' : 'text-amber-400'}`}>
                   {commentMsg}
@@ -628,7 +682,9 @@ export default function WritePage() {
             </div>
             {currentComment && (
               <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
-                <p className="text-xs font-semibold text-amber-400 mb-1">✦ AIコメント（現在）</p>
+                <p className="text-xs font-semibold text-amber-400 mb-1">
+                  {editSlug ? '✦ AIコメント（現在）' : '✦ AIコメント（投稿時に保存されます）'}
+                </p>
                 <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{currentComment}</p>
               </div>
             )}
@@ -701,7 +757,7 @@ export default function WritePage() {
         <div className="pt-2 flex justify-end">
           <button
             type="submit"
-            disabled={submitting || !title.trim()}
+            disabled={submitting || analyzeStep !== null || !title.trim()}
             className="btn btn-solid disabled:opacity-50 min-w-[7rem] text-left"
           >
             {submitting ? (submitStatus ?? '準備中...') : editSlug ? '更新する' : '投稿する'}

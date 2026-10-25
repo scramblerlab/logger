@@ -50,6 +50,14 @@ export const api = {
       request(`/articles/${slug}/ai-comment`, { method: 'POST' }),
     aiCommentStatus: (slug: string): Promise<{ status: string; result: { ai_comment: string; ai_comment_model: string } | null; error: string | null }> =>
       request(`/articles/${slug}/ai-comment/status`),
+    aiCommentPreview: (title: string, body: string): Promise<{ job_id: string }> =>
+      request('/articles/ai-comment-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body }),
+      }),
+    aiCommentPreviewStatus: (jobId: string): Promise<{ status: string; result: { ai_comment: string; ai_comment_model: string } | null; error: string | null }> =>
+      request(`/articles/ai-comment-preview/status/${jobId}`),
     aiCommentBulk: (): Promise<{ started: boolean }> =>
       request('/articles/ai-comment-bulk', { method: 'POST' }),
     aiCommentBulkStatus: (): Promise<{ status: string; progress: string; current_title: string; updated: number; total: number; failed: number }> =>

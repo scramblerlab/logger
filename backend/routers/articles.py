@@ -15,7 +15,7 @@ from slugify import slugify
 from auth import get_current_user, get_optional_user
 from database import get_db, SessionLocal
 from models import Article, Tag
-from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, BulkCategorizeRequest
+from schemas import ArticleOut, ArticleCard, ArticleCreate, ArticleListResponse, AIClassifyRequest, AICommentPreviewRequest, BulkCategorizeRequest
 from services import storage, ai_classifier, ai_commenter, task_manager, single_job
 from services.tokenizer import tokenize_ja
 
@@ -136,6 +136,8 @@ async def create_article(
     source_url: Optional[str] = Form(None),
     source_site: Optional[str] = Form(None),
     guest_visible: bool = Form(True),
+    ai_comment: Optional[str] = Form(None),
+    ai_comment_model: Optional[str] = Form(None),
     hero_image: Optional[UploadFile] = File(None),
     additional_images: list[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
@@ -181,13 +183,15 @@ async def create_article(
         source_url=source_url,
         source_site=source_site,
         guest_visible=guest_visible,
+        ai_comment=ai_comment or None,
+        ai_comment_model=(ai_comment_model or None) if ai_comment else None,
         data_path=f"articles/{slug}",
     )
     db.add(article)
     await db.flush()  # get rowid
 
     # Write JSON file
-    storage.write_article_json(slug, {
+    art_json = {
         "id": article.id,
         "slug": slug,
         "title": title,
@@ -199,7 +203,11 @@ async def create_article(
         "publishedAt": pub_dt.isoformat(),
         "sourceSite": source_site,
         "guestVisible": guest_visible,
-    })
+    }
+    if article.ai_comment:
+        art_json["ai_comment"] = article.ai_comment
+        art_json["ai_comment_model"] = article.ai_comment_model
+    storage.write_article_json(slug, art_json)
 
     await _upsert_tags(db, tag_list)
     await _fts_upsert(db, article)
@@ -228,6 +236,29 @@ async def _run_classify(job_id: str, title: str, body: str) -> None:
         single_job.done(job_id, result)
     except Exception as exc:
         logger.exception("classify job %s failed", job_id)
+        single_job.fail(job_id, str(exc))
+
+
+@router.post("/ai-comment-preview", status_code=202)
+async def ai_comment_preview_start(req: AICommentPreviewRequest, _: str = Depends(get_current_user)):
+    """Generate an AI comment for an unsaved article (new-post page). Nothing is persisted —
+    the client sends the result back with the create request. Poll /ai-comment-preview/status/{job_id}."""
+    job_id = single_job.create()
+    asyncio.create_task(_run_comment_preview(job_id, req.title, req.body))
+    return {"job_id": job_id}
+
+
+@router.get("/ai-comment-preview/status/{job_id}")
+async def ai_comment_preview_status(job_id: str):
+    return single_job.get(job_id)
+
+
+async def _run_comment_preview(job_id: str, title: str, body: str) -> None:
+    try:
+        comment, comment_model = await ai_commenter.generate(title, body)
+        single_job.done(job_id, {"ai_comment": comment, "ai_comment_model": comment_model})
+    except Exception as exc:
+        logger.exception("comment preview job %s failed", job_id)
         single_job.fail(job_id, str(exc))
 
 

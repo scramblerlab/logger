@@ -111,6 +111,11 @@ class AIClassifyRequest(BaseModel):
     body: str = ""
 
 
+class AICommentPreviewRequest(BaseModel):
+    title: str
+    body: str = ""
+
+
 class AIClassifyResult(BaseModel):
     categories: list[str]
     tags: list[str]
