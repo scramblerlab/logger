@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 @router.get("", response_model=SearchResponse)
 async def search_articles(
     q: str = Query(..., min_length=1),
-    limit: int = Query(20, le=100),
+    limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     viewer: Optional[str] = Depends(get_optional_user),
 ):

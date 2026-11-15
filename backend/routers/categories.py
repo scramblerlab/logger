@@ -1,6 +1,6 @@
 import json
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,7 +46,7 @@ async def list_categories(
 
 
 @router.get("/tags", response_model=list[TagOut])
-async def list_tags(limit: int = 50, db: AsyncSession = Depends(get_db)):
+async def list_tags(limit: int = Query(50, ge=1, le=200), db: AsyncSession = Depends(get_db)):
     from models import Tag
     result = await db.execute(
         select(Tag).order_by(Tag.article_count.desc()).limit(limit)

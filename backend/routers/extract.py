@@ -1,9 +1,13 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
 from auth import get_current_user
 from services import web_extractor
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/extract", tags=["extract"])
 
@@ -27,5 +31,6 @@ async def extract_url(req: ExtractRequest, _: str = Depends(get_current_user)):
     try:
         result = await web_extractor.extract_article(req.url)
         return result
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    except Exception:
+        logger.exception("extract failed for %s", req.url)
+        raise HTTPException(status_code=422, detail="記事を取得できませんでした")

@@ -22,6 +22,14 @@ from services.tokenizer import tokenize_ja
 router = APIRouter(prefix="/api/articles", tags=["articles"])
 
 
+def _parse_json_field(raw: str, field: str):
+    """Parse a JSON form field, returning 422 (not an unhandled 500) on bad input."""
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(422, f"Invalid JSON in form field '{field}'")
+
+
 async def _upsert_tags(db: AsyncSession, tag_names: list[str]):
     for name in tag_names:
         slug = slugify(name, separator="-")
@@ -49,7 +57,7 @@ async def list_articles(
     category: Optional[str] = None,
     tag: Optional[str] = None,
     page: int = Query(1, ge=1),
-    limit: int = Query(20, le=100),
+    limit: int = Query(20, ge=1, le=100),
     sort: str = Query("published"),
     db: AsyncSession = Depends(get_db),
     viewer: Optional[str] = Depends(get_optional_user),
@@ -124,9 +132,9 @@ async def _save_uploaded_image(slug: str, upload: UploadFile, is_hero: bool = Fa
     )
     try:
         return await storage.save_upload(slug, data, upload.filename or "image.jpg", is_hero=is_hero)
-    except Exception as exc:
+    except Exception:
         logger.exception("save image failed: slug=%s hero=%s file=%r", slug, is_hero, upload.filename)
-        raise HTTPException(422, f"画像を処理できませんでした ({upload.filename}, {upload.content_type}): {exc}")
+        raise HTTPException(422, f"画像を処理できませんでした ({upload.filename}, {upload.content_type})")
 
 
 @router.post("", response_model=ArticleOut, status_code=201)
@@ -146,8 +154,8 @@ async def create_article(
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
-    cats = json.loads(categories)
-    tag_list = json.loads(tags)
+    cats = _parse_json_field(categories, "categories")
+    tag_list = _parse_json_field(tags, "tags")
 
     date_prefix = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     slug = f"{date_prefix}-{slugify(title, max_length=50, separator='-')}-{uuid.uuid4().hex[:4]}"
@@ -384,9 +392,9 @@ async def update_article(
     if body is not None:
         article.body = body
     if categories is not None:
-        article.categories = json.dumps(json.loads(categories), ensure_ascii=False)
+        article.categories = json.dumps(_parse_json_field(categories, "categories"), ensure_ascii=False)
     if tags is not None:
-        tag_list = json.loads(tags)
+        tag_list = _parse_json_field(tags, "tags")
         article.tags = json.dumps(tag_list, ensure_ascii=False)
         await _upsert_tags(db, tag_list)
     if published_at is not None:
@@ -400,7 +408,7 @@ async def update_article(
         article.guest_visible = guest_visible
 
     # Remove requested images from disk (rel_path values match article.json additionalImages entries)
-    paths_to_remove: list[str] = json.loads(remove_image_paths)
+    paths_to_remove: list[str] = _parse_json_field(remove_image_paths, "remove_image_paths")
     if paths_to_remove:
         for rel_path in paths_to_remove:
             target = storage.safe_article_path(slug, rel_path)
@@ -438,9 +446,9 @@ async def update_article(
         if body is not None:
             art_json["body"] = body
         if categories is not None:
-            art_json["categories"] = json.loads(categories)
+            art_json["categories"] = _parse_json_field(categories, "categories")
         if tags is not None:
-            art_json["tags"] = json.loads(tags)
+            art_json["tags"] = _parse_json_field(tags, "tags")
         if (hero_image and hero_image.filename) or reuse_image_as_hero:
             art_json["heroImage"] = article.hero_image
         if published_at is not None:
@@ -481,11 +489,11 @@ async def upload_article_image(
     )
     try:
         rel = await storage.save_upload(slug, data, filename)
-    except Exception as exc:
+    except Exception:
         # Previously any Pillow failure surfaced as an opaque 500 with no log,
         # and the editor silently dropped the image block.
         logger.exception("image upload failed: slug=%s file=%s", slug, filename)
-        raise HTTPException(500, f"Image processing failed: {exc}")
+        raise HTTPException(500, "Image processing failed")
 
     art_json = storage.read_article_json(slug) or {}
     art_json.setdefault("additionalImages", []).append(rel)
