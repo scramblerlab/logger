@@ -24,8 +24,8 @@ router = APIRouter(prefix="/api/shopify", tags=["shopify"])
 
 
 @router.post("/blogs", response_model=ShopifyBlogsResponse)
-async def list_blogs(req: ShopifyBlogsRequest):
-    """List all blogs in a Shopify store (no editor auth needed — proxies Shopify API)."""
+async def list_blogs(req: ShopifyBlogsRequest, _: str = Depends(get_current_user)):
+    """List all blogs in a Shopify store (editor-only; proxies the Shopify Admin API)."""
     blogs = await shopify_service.list_blogs(req.shop_url, req.client_id, req.client_secret)
     return ShopifyBlogsResponse(blogs=[ShopifyBlog(**b) for b in blogs])
 

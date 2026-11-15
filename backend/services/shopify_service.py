@@ -10,6 +10,7 @@ Authentication: Client Credentials Grant (new Shopify Dev Dashboard flow).
     grant_type=client_credentials&client_id=...&client_secret=...
 """
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import AsyncIterator
@@ -18,9 +19,19 @@ import html2text
 import httpx
 import markdown as _md
 from bs4 import BeautifulSoup
+from fastapi import HTTPException
 from slugify import slugify
 
 _API_VERSION = "2024-01"
+
+# SSRF guard: these flows build `https://{shop_url}/admin/...`, so shop_url must be a real
+# Shopify store host and nothing else (no internal hosts, no scheme or path components).
+_SHOP_URL_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$", re.IGNORECASE)
+
+
+def validate_shop_url(shop_url: str) -> None:
+    if not shop_url or not _SHOP_URL_RE.match(shop_url):
+        raise HTTPException(400, "shop_url must be a <store>.myshopify.com host")
 
 
 async def _get_access_token(shop_url: str, client_id: str, client_secret: str) -> str:
@@ -29,6 +40,7 @@ async def _get_access_token(shop_url: str, client_id: str, client_secret: str) -
     This is the Client Credentials Grant introduced in the new Shopify Dev Dashboard.
     Tokens are refreshed by repeating the same request — no refresh_token needed.
     """
+    validate_shop_url(shop_url)
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(
             f"https://{shop_url}/admin/oauth/access_token",

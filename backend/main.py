@@ -36,7 +36,14 @@ async def lifespan(app: FastAPI):
     await task_manager.cancel_comment()
 
 
-app = FastAPI(title="logger", lifespan=lifespan)
+_enable_docs = os.getenv("ENABLE_DOCS", "").lower() in ("1", "true", "yes")
+app = FastAPI(
+    title="logger",
+    lifespan=lifespan,
+    docs_url="/docs" if _enable_docs else None,
+    redoc_url="/redoc" if _enable_docs else None,
+    openapi_url="/openapi.json" if _enable_docs else None,
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
