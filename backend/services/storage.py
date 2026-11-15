@@ -35,6 +35,23 @@ def _article_dir(slug: str) -> Path:
     return Path(ARTICLES_DIR) / slug
 
 
+def safe_article_path(slug: str, rel_path: str) -> Optional[Path]:
+    """Resolve rel_path inside the article's own folder, or return None if it escapes.
+
+    Guards the user-controlled remove_image_paths / reuse_image_as_hero values against
+    absolute paths and `..` traversal that could otherwise delete or read files outside
+    articles/<slug>/ (e.g. blog.db, .env, editors.json).
+    """
+    base = _article_dir(slug).resolve()
+    try:
+        target = (base / rel_path).resolve()
+    except (ValueError, OSError):
+        return None
+    if target != base and target.is_relative_to(base):
+        return target
+    return None
+
+
 def article_image_url(slug: str, filename: str) -> str:
     return f"/static/articles/{slug}/{filename}"
 
@@ -136,8 +153,8 @@ def read_article_json(slug: str) -> Optional[dict]:
 
 def copy_image_as_hero(slug: str, rel_path: str) -> str | None:
     """Copy an existing article image to hero.jpg (re-optimized)."""
-    src = _article_dir(slug) / rel_path
-    if not src.exists():
+    src = safe_article_path(slug, rel_path)
+    if src is None or not src.exists():
         return None
     data = src.read_bytes()
     dest = _article_dir(slug) / "hero.jpg"

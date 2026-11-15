@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/import", tags=["import"])
 
 
 @router.post("/analyze", response_model=ImportAnalyzeResponse)
-async def analyze_site(req: ImportAnalyzeRequest):
+async def analyze_site(req: ImportAnalyzeRequest, _: str = Depends(get_current_user)):
     result = await wp_importer.analyze(req.url)
     return ImportAnalyzeResponse(**result)
 

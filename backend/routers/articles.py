@@ -91,9 +91,12 @@ async def ai_comment_bulk(_: str = Depends(get_current_user)):
 
 
 @router.get("/ai-comment-bulk/status")
-async def ai_comment_bulk_status():
-    """Return current AI comment generation task state (public — read-only)."""
-    return task_manager.get_comment_state()
+async def ai_comment_bulk_status(viewer: Optional[str] = Depends(get_optional_user)):
+    """Return AI comment task state. Hidden-article titles are redacted for guests."""
+    state = task_manager.get_comment_state()
+    if viewer is None:
+        state["current_title"] = None
+    return state
 
 
 @router.get("/{slug}", response_model=ArticleOut)
@@ -226,7 +229,7 @@ async def ai_classify_start(req: AIClassifyRequest, _: str = Depends(get_current
 
 
 @router.get("/ai-classify/status/{job_id}")
-async def ai_classify_status(job_id: str):
+async def ai_classify_status(job_id: str, _: str = Depends(get_current_user)):
     return single_job.get(job_id)
 
 
@@ -249,7 +252,7 @@ async def ai_comment_preview_start(req: AICommentPreviewRequest, _: str = Depend
 
 
 @router.get("/ai-comment-preview/status/{job_id}")
-async def ai_comment_preview_status(job_id: str):
+async def ai_comment_preview_status(job_id: str, _: str = Depends(get_current_user)):
     return single_job.get(job_id)
 
 
@@ -273,9 +276,12 @@ async def ai_categorize_all(_: str = Depends(get_current_user)):
 
 
 @router.get("/ai-categorize/status")
-async def ai_categorize_status():
-    """Return current AI categorization task state (public — read-only)."""
-    return task_manager.get_state()
+async def ai_categorize_status(viewer: Optional[str] = Depends(get_optional_user)):
+    """Return AI categorization task state. Hidden-article titles are redacted for guests."""
+    state = task_manager.get_state()
+    if viewer is None:
+        state["current_title"] = None
+    return state
 
 
 @router.patch("/bulk-categorize", status_code=200)
@@ -317,7 +323,7 @@ async def ai_comment_start(
 
 
 @router.get("/{slug}/ai-comment/status")
-async def ai_comment_status(slug: str):
+async def ai_comment_status(slug: str, _: str = Depends(get_current_user)):
     return single_job.get(f"comment:{slug}")
 
 
@@ -394,13 +400,11 @@ async def update_article(
         article.guest_visible = guest_visible
 
     # Remove requested images from disk (rel_path values match article.json additionalImages entries)
-    from pathlib import Path
     paths_to_remove: list[str] = json.loads(remove_image_paths)
     if paths_to_remove:
-        art_dir = Path(storage.ARTICLES_DIR) / slug
         for rel_path in paths_to_remove:
-            target = art_dir / rel_path
-            if target.exists():
+            target = storage.safe_article_path(slug, rel_path)
+            if target and target.exists():
                 target.unlink()
 
     # Replace hero image (uploaded file takes precedence over reuse path)
