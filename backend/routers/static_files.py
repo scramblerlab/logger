@@ -30,13 +30,16 @@ async def serve_article_file(
     if path == "article.json" or path.endswith("/article.json"):
         raise HTTPException(404, "Not found")
 
-    # Guests may only read files belonging to a guest-visible article.
+    # Guests may only read files of a guest-visible, saved article. Editors may
+    # additionally read files under slugs that are not saved articles — e.g. the
+    # staging_<uuid> folders the URL extractor writes for its preview.
     row = (await db.execute(
         select(Article.guest_visible).where(Article.slug == slug)
     )).first()
     if row is None:
-        raise HTTPException(404, "Not found")
-    if viewer is None and not row[0]:
+        if viewer is None:
+            raise HTTPException(404, "Not found")
+    elif viewer is None and not row[0]:
         raise HTTPException(404, "Not found")
 
     # Containment check (blocks ../ and absolute paths) + must be a real file.
