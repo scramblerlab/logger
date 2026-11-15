@@ -20,11 +20,12 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from database import init_db, DATA_DIR
-from routers import articles, categories, search, importer, auth, ai_chat, translate, extract, shared_storage, push
+from routers import articles, categories, search, importer, auth, ai_chat, translate, extract, shared_storage, push, static_files
 from routers import shopify_importer
 from routers.auth import limiter
-from services import task_manager
+from services import task_manager, audit
 from services.shared_storage_service import ensure_shared_dir
+from auth import verify_token
 
 
 @asynccontextmanager
@@ -92,9 +93,30 @@ async def _log_article_writes(request, call_next):
     log.info("← %s %s status=%d %.2fs", request.method, request.url.path, response.status_code, time.monotonic() - started)
     return response
 
-articles_static = os.path.join(DATA_DIR, "articles")
-os.makedirs(articles_static, exist_ok=True)
-app.mount("/static/articles", StaticFiles(directory=articles_static), name="static_articles")
+
+@app.middleware("http")
+async def _audit_log(request, call_next):
+    # Record who did what for state-changing API calls (analytics / audit trail).
+    response = await call_next(request)
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.url.path.startswith("/api/"):
+        actor = None
+        token = request.cookies.get("auth_token") or request.cookies.get("__Host-auth_token")
+        if token:
+            try:
+                actor = verify_token(token)
+            except Exception:
+                actor = None
+        try:
+            audit.record(
+                actor=actor,
+                ip=request.client.host if request.client else None,
+                method=request.method,
+                path=request.url.path,
+                status=response.status_code,
+            )
+        except Exception:
+            logging.getLogger("audit").warning("audit record failed", exc_info=True)
+    return response
 
 app.include_router(auth.router)
 app.include_router(articles.router)
@@ -107,6 +129,7 @@ app.include_router(translate.router)
 app.include_router(extract.router)
 app.include_router(shared_storage.router)
 app.include_router(push.router)
+app.include_router(static_files.router)
 
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
