@@ -20,7 +20,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from database import init_db, DATA_DIR
-from routers import articles, categories, search, importer, auth, ai_chat, translate, extract, shared_storage, push, static_files
+from routers import articles, categories, search, importer, auth, ai_chat, extract, shared_storage, push, static_files
 from routers import shopify_importer
 from routers.auth import limiter
 from services import task_manager, audit
@@ -125,7 +125,6 @@ app.include_router(search.router)
 app.include_router(importer.router)
 app.include_router(shopify_importer.router)
 app.include_router(ai_chat.router)
-app.include_router(translate.router)
 app.include_router(extract.router)
 app.include_router(shared_storage.router)
 app.include_router(push.router)

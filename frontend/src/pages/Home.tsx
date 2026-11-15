@@ -12,7 +12,6 @@ import BulkActionsModal from '../components/BulkActionsModal';
 import CategoryPickerModal from '../components/CategoryPickerModal';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
-import { useTranslation } from '../context/TranslationContext';
 import { useSearchResults } from '../context/SearchContext';
 import LoginModal from '../components/LoginModal';
 
@@ -33,9 +32,6 @@ export default function Home() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [heroArticle, setHeroArticle] = useState<ArticleCardType | null>(null);
   const [allCount, setAllCount] = useState(0);
-  const [translatedTitles, setTranslatedTitles] = useState<Map<string, string> | null>(null);
-  const [translatedCategoryLabels, setTranslatedCategoryLabels] = useState<Map<string, string> | null>(null);
-  const [translatedLabels, setTranslatedLabels] = useState<{ category: string; all: string; tag: string } | null>(null);
   const [showLogin, setShowLogin] = useState(false);
 
   const activeCategory = searchParams.get('category') ?? localStorage.getItem('activeCategory');
@@ -57,7 +53,6 @@ export default function Home() {
   const loaderRef = useRef<HTMLDivElement>(null);
   const { isEditor, logout } = useAuth();
   const { setOnComplete } = useAiJob();
-  const { registerHandlers } = useTranslation();
   const { setHitCount } = useSearchResults();
 
   useEffect(() => {
@@ -150,45 +145,7 @@ export default function Home() {
 
   const displayedArticles = searchResults ?? articles;
 
-  const displayedArticlesRef = useRef(displayedArticles);
-  const categoriesRef = useRef(categories);
-  useEffect(() => { displayedArticlesRef.current = displayedArticles; }, [displayedArticles]);
-  useEffect(() => { categoriesRef.current = categories; }, [categories]);
-
-  useEffect(() => {
-    registerHandlers({
-      onSelect: async (language) => {
-        const arts = displayedArticlesRef.current;
-        const cats = categoriesRef.current;
-        const [titlesResult, catsResult, labelsResult] = await Promise.all([
-          arts.length > 0
-            ? api.translate.titles({ titles: arts.map((a) => a.title), target_language: language })
-            : Promise.resolve({ titles: [] as string[] }),
-          cats.length > 0
-            ? api.translate.titles({ titles: cats.map((c) => c.name_ja), target_language: language })
-            : Promise.resolve({ titles: [] as string[] }),
-          api.translate.titles({ titles: ['カテゴリー', 'すべて', 'タグ'], target_language: language }),
-        ]);
-        setTranslatedTitles(new Map(arts.map((a, i) => [a.id, titlesResult.titles[i] ?? a.title])));
-        setTranslatedCategoryLabels(new Map(cats.map((c, i) => [c.slug, catsResult.titles[i] ?? c.name_ja])));
-        setTranslatedLabels({
-          category: labelsResult.titles[0] ?? 'カテゴリー',
-          all: labelsResult.titles[1] ?? 'すべて',
-          tag: labelsResult.titles[2] ?? 'タグ',
-        });
-      },
-      onReset: () => {
-        setTranslatedTitles(null);
-        setTranslatedCategoryLabels(null);
-        setTranslatedLabels(null);
-      },
-    });
-    return () => registerHandlers(null);
-  }, [registerHandlers]);
-
-  const finalArticles = translatedTitles
-    ? displayedArticles.map((a) => ({ ...a, title: translatedTitles.get(a.id) ?? a.title }))
-    : displayedArticles;
+  const finalArticles = displayedArticles;
 
   useEffect(() => {
     const saved = localStorage.getItem('activeCategory');
@@ -217,8 +174,8 @@ export default function Home() {
   const activeCategoryLabel = activeTag
     ? `#${activeTag}`
     : activeCat
-      ? `${translatedLabels?.category ?? 'カテゴリー'}: ${translatedCategoryLabels?.get(activeCat.slug) ?? activeCat.name_ja}`
-      : `${translatedLabels?.category ?? 'カテゴリー'}: ${translatedLabels?.all ?? 'すべて'}`;
+      ? `カテゴリー: ${activeCat.name_ja}`
+      : `カテゴリー: すべて`;
 
   // `total` is the server-side count for the active category/tag filter, so it
   // stays correct for tags too — unlike category.article_count.
@@ -295,7 +252,6 @@ export default function Home() {
           <Sidebar
             tags={tags}
             onSelectTag={handleSelectTag}
-            labels={translatedLabels ?? undefined}
           />
         </div>
 
@@ -379,8 +335,6 @@ export default function Home() {
           onSelectCategory={handleSelectCategory}
           onOpenCategoryEdit={() => setShowCategoryEdit(true)}
           onClose={() => setShowCategoryPicker(false)}
-          categoryLabels={translatedCategoryLabels ?? undefined}
-          labels={translatedLabels ?? undefined}
         />
       )}
 

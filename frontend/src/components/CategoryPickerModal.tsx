@@ -8,8 +8,6 @@ interface Props {
   onSelectCategory: (slug: string | null) => void;
   onOpenCategoryEdit: () => void;
   onClose: () => void;
-  categoryLabels?: Map<string, string>;
-  labels?: { category: string; all: string; tag: string };
 }
 
 /**
@@ -19,7 +17,6 @@ interface Props {
 export default function CategoryPickerModal({
   categories, activeCategory, allCount,
   onSelectCategory, onOpenCategoryEdit, onClose,
-  categoryLabels, labels,
 }: Props) {
   const { isEditor } = useAuth();
 
@@ -42,7 +39,7 @@ export default function CategoryPickerModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-rim">
-          <h2 className="text-base font-semibold text-slate-100">{labels?.category ?? 'カテゴリー'}</h2>
+          <h2 className="text-base font-semibold text-slate-100">カテゴリー</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-100 text-xl leading-none transition-colors">×</button>
         </div>
 
@@ -50,7 +47,7 @@ export default function CategoryPickerModal({
           <ul className="space-y-0.5">
             <li>
               <button onClick={() => pick(null)} className={itemCls(!activeCategory)}>
-                <span className="flex-1">{labels?.all ?? 'すべて / All'}</span>
+                <span className="flex-1">すべて / All</span>
                 {!!allCount && <span className="text-xs text-slate-500 tabular-nums">{allCount}</span>}
               </button>
             </li>
@@ -58,7 +55,7 @@ export default function CategoryPickerModal({
               <li key={cat.slug}>
                 <button onClick={() => pick(cat.slug)} className={itemCls(activeCategory === cat.slug)}>
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-                  <span className="flex-1">{categoryLabels?.get(cat.slug) ?? cat.name_ja}</span>
+                  <span className="flex-1">{cat.name_ja}</span>
                   <span className="text-slate-600 text-xs">{cat.name_en}</span>
                   {cat.article_count > 0 && (
                     <span className="text-xs text-slate-500 tabular-nums">{cat.article_count}</span>
