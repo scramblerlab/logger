@@ -2,9 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAiJob } from '../context/AiJobContext';
-import { useTranslation } from '../context/TranslationContext';
 import { useSearchResults } from '../context/SearchContext';
-import TranslateButton from './TranslateButton';
 import ExtractDialog from './ExtractDialog';
 import logo from '../assets/logo.png';
 
@@ -18,7 +16,6 @@ export default function Header({ onSearch }: Props) {
   const navigate = useNavigate();
   const { isEditor } = useAuth();
   const { status: aiStatus, currentTitle: aiTitle } = useAiJob();
-  const { translating, translated, triggerTranslate, triggerReset } = useTranslation();
   const { hitCount } = useSearchResults();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -68,12 +65,6 @@ export default function Header({ onSearch }: Props) {
 
           {/* Desktop nav */}
           <nav className="hidden sm:flex ml-auto items-center gap-2">
-            <TranslateButton
-              onSelect={triggerTranslate}
-              translating={translating}
-              translated={translated}
-              onReset={triggerReset}
-            />
             {aiStatus === 'running' && (
               <span className="hidden lg:flex items-center gap-1.5 text-xs text-amber-400 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
@@ -98,12 +89,6 @@ export default function Header({ onSearch }: Props) {
 
         {/* ── Row 2 (mobile only): action buttons ── */}
         <div className="sm:hidden flex items-center gap-2 pb-2">
-          <TranslateButton
-            onSelect={triggerTranslate}
-            translating={translating}
-            translated={translated}
-            onReset={triggerReset}
-          />
           {isEditor && (
             <>
               <button onClick={() => setShowExtract(true)} className="btn btn-solid">抽出</button>

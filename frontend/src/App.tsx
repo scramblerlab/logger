@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
 import Home from './pages/Home';
 import ArticlePage from './pages/ArticlePage';
-import { TranslationProvider } from './context/TranslationContext';
 import { SearchProvider } from './context/SearchContext';
 
 const WritePage = lazy(() => import('./pages/WritePage'));
@@ -42,11 +41,9 @@ function AppInner() {
 export default function App() {
   return (
     <BrowserRouter>
-      <TranslationProvider>
-        <SearchProvider>
-          <AppInner />
-        </SearchProvider>
-      </TranslationProvider>
+      <SearchProvider>
+        <AppInner />
+      </SearchProvider>
     </BrowserRouter>
   );
 }

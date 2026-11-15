@@ -111,20 +111,6 @@ export const api = {
         body: JSON.stringify(data),
       }),
   },
-  translate: {
-    article: (data: { title: string; body: string; ai_comment: string | null; target_language: string }): Promise<{ title: string; body: string; ai_comment: string | null }> =>
-      request('/translate/article', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      }),
-    titles: (data: { titles: string[]; target_language: string }): Promise<{ titles: string[] }> =>
-      request('/translate/titles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      }),
-  },
   auth: {
     login: (email: string, password: string) =>
       fetch(`${BASE}/auth/login`, {

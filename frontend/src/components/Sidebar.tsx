@@ -3,20 +3,19 @@ import type { Tag } from '../types';
 interface Props {
   tags: Tag[];
   onSelectTag: (tag: string) => void;
-  labels?: { category: string; all: string; tag: string };
 }
 
 /**
  * Tags only. Category selection lives in CategoryPickerModal and every editor
  * action lives in BulkActionsModal, so nothing else belongs here.
  */
-export default function Sidebar({ tags, onSelectTag, labels }: Props) {
+export default function Sidebar({ tags, onSelectTag }: Props) {
   if (tags.length === 0) return null;
 
   return (
     <aside className="w-64 flex-shrink-0">
       <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-        {labels?.tag ?? 'タグ'}
+        タグ
       </h3>
       <div className="flex flex-wrap gap-1.5">
         {tags.slice(0, 30).map((tag) => (
