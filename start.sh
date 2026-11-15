@@ -42,7 +42,7 @@ FRONTEND_PID=$!
 
 # --- CloudFlare Tunnel ---
 CF_CONFIG="$PROJECT_DIR/cloudflare/config.yml"
-CF_HOSTNAME=$(grep -E '^\s+hostname:' "$CF_CONFIG" | head -1 | awk '{print $2}')
+CF_HOSTNAME=$(awk -F'hostname:' '/hostname:/{split($2,a," "); print a[1]; exit}' "$CF_CONFIG")
 echo "Starting CloudFlare tunnel (exposing https://${CF_HOSTNAME})..."
 cloudflared tunnel --config "$CF_CONFIG" run &>/tmp/cloudflared.log &
 CLOUDFLARED_PID=$!
