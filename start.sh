@@ -3,6 +3,7 @@
 
 set -e
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+UV_BIN="$(command -v uv || echo "$HOME/.local/bin/uv")"
 
 # --- aimodel proxy check ---
 # Ollama is managed by aimodel — this app connects through the proxy on :11431.
@@ -20,15 +21,20 @@ fi
 echo "aimodel proxy ready (${OLLAMA_BASE_URL})"
 
 # --- Backend ---
+echo "Syncing backend dependencies..."
+cd "$PROJECT_DIR/backend"
+[ -d .venv ] || "$UV_BIN" venv .venv
+"$UV_BIN" pip install --python .venv/bin/python -r requirements.txt
 echo "Starting backend on port 8000..."
 lsof -ti :8000 | xargs kill -9 2>/dev/null || true
-cd "$PROJECT_DIR/backend"
 .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
 BACKEND_PID=$!
 
 # --- Frontend ---
-echo "Building frontend..."
+echo "Installing frontend dependencies..."
 cd "$PROJECT_DIR/frontend"
+npm install
+echo "Building frontend..."
 npm run build
 echo "Starting frontend on port 5173..."
 npm run dev &
