@@ -127,12 +127,11 @@ def _write_and_optimize(data: bytes, dest: Path):
 
 
 async def download_and_save(slug: str, url: str, filename: str, is_hero: bool = False) -> Optional[str]:
-    import httpx
+    from services.safe_fetch import safe_get
     try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            r = await client.get(url)
-            r.raise_for_status()
-            return await save_upload(slug, r.content, filename, is_hero=is_hero)
+        r = await safe_get(url, max_bytes=25 * 1024 * 1024)
+        r.raise_for_status()
+        return await save_upload(slug, r.content, filename, is_hero=is_hero)
     except Exception:
         return None
 

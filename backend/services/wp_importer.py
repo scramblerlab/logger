@@ -11,6 +11,8 @@ import html2text
 import httpx
 from bs4 import BeautifulSoup
 
+from services import safe_fetch
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 }
@@ -76,7 +78,7 @@ def _html_to_md(html: str) -> str:
 async def analyze(url: str) -> dict:
     """Return a preview of what would be imported from a WP site URL."""
     base = _base_url(url)
-    async with httpx.AsyncClient(headers=HEADERS, timeout=20, follow_redirects=True) as client:
+    async with safe_fetch.safe_client(headers=HEADERS, timeout=20, follow_redirects=True) as client:
         method, posts = await _fetch_posts(client, url, base, limit=5)
 
     titles = [p.get("title", "") for p in posts[:5]]
@@ -109,7 +111,7 @@ async def _resolve_category_id(client: httpx.AsyncClient, base: str, slug: str) 
 
 
 async def _estimate_count(url: str, base: str) -> int:
-    async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
+    async with safe_fetch.safe_client(headers=HEADERS, timeout=15, follow_redirects=True) as client:
         try:
             wp_base, cat_id = await _detect_wp_base(client, url)
             params: dict = {"per_page": 1, "_fields": "id"}
@@ -353,7 +355,7 @@ async def import_articles(
     """
     base = _base_url(url)
     lim = limit or 500
-    async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
+    async with safe_fetch.safe_client(headers=HEADERS, timeout=30, follow_redirects=True) as client:
         method, posts = await _fetch_posts(client, url, base, limit=lim)
 
     total = len(posts)

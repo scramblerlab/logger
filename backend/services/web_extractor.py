@@ -8,7 +8,7 @@ from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 import html2text
-import httpx
+from services.safe_fetch import safe_get
 from bs4 import BeautifulSoup, Tag
 
 from services.storage import download_and_save
@@ -226,10 +226,9 @@ async def extract_article(url: str) -> dict:
     parsed = urlparse(url)
     base = f"{parsed.scheme}://{parsed.netloc}"
 
-    async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
-        r = await client.get(url)
-        r.raise_for_status()
-        html = r.text
+    r = await safe_get(url, headers=HEADERS, max_bytes=10 * 1024 * 1024)
+    r.raise_for_status()
+    html = r.text
 
     soup = BeautifulSoup(html, "html.parser")
 
